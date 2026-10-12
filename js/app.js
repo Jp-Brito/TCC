@@ -26,7 +26,9 @@
     zoom: cfg.mapa.zoom,
     minZoom: cfg.mapa.zoomMin,
     maxZoom: cfg.mapa.zoomMax,
-    zoomControl: false
+    zoomControl: false,
+    preferCanvas: true,
+    renderer: L.canvas({ padding: 0.5, tolerance: 8 })   // pontos leves e fáceis de tocar
   });
 
   // Créditos: tira o prefixo "Leaflet" e deixa só o "i" recolhido.
@@ -68,6 +70,65 @@
     clearTimeout(timerAviso);
     timerAviso = setTimeout(function () { aviso.hidden = true; }, 5000);
   }
+
+  /* ---------- Paradas de ônibus ---------- */
+  var indiceParadas = null;
+  var camadaParadas = L.layerGroup().addTo(mapa);
+
+  // Por enquanto, ao tocar numa parada só mostramos o nome.
+  // O painel com as previsões de chegada entra na próxima etapa.
+  function aoSelecionarParada(parada) {
+    mostrarAviso(parada.nome + " (parada " + parada.id + ")");
+  }
+
+  function desenharParadas() {
+    camadaParadas.clearLayers();
+    if (!indiceParadas || mapa.getZoom() < cfg.paradas.zoomMinimo) return;
+
+    var area = mapa.getBounds();
+    var centro = mapa.getCenter();
+    var lista = indiceParadas.emRetangulo(
+      area.getSouth(), area.getWest(), area.getNorth(), area.getEast()
+    );
+
+    // Se houver pontos demais, fica com os mais próximos do centro da tela
+    if (lista.length > cfg.paradas.maxMarcadores) {
+      lista.sort(function (a, b) {
+        return distancia2(a, centro) - distancia2(b, centro);
+      });
+      lista = lista.slice(0, cfg.paradas.maxMarcadores);
+    }
+
+    lista.forEach(function (parada) {
+      L.circleMarker([parada.lat, parada.lon], {
+        radius: 7,
+        color: "#ffffff",
+        weight: 2,
+        fillColor: "#8B5CF6",
+        fillOpacity: 1
+      }).on("click", function () { aoSelecionarParada(parada); })
+        .addTo(camadaParadas);
+    });
+  }
+
+  // Distância ao quadrado (basta para ordenar do mais perto ao mais longe)
+  function distancia2(parada, centro) {
+    var dLat = parada.lat - centro.lat;
+    var dLon = parada.lon - centro.lng;
+    return dLat * dLat + dLon * dLon;
+  }
+
+  mapa.on("moveend", desenharParadas);
+
+  Paradas.carregar(cfg.paradas.arquivo).then(function (indice) {
+    indiceParadas = indice;
+    desenharParadas();
+    if (mapa.getZoom() < cfg.paradas.zoomMinimo) {
+      mostrarAviso("Aproxime o mapa para ver os pontos de ônibus.");
+    }
+  }).catch(function () {
+    mostrarAviso("Não foi possível carregar os pontos de ônibus.");
+  });
 
   /* ---------- Localização do usuário ---------- */
   var marcadorUsuario = null;

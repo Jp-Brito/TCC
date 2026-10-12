@@ -3,6 +3,11 @@
 window.APP_CONFIG = {
   nome: "Ônibus ao Vivo SP",
   sigla: "OVSP",
+  paradas: {
+    arquivo: "data/stops.json",
+    zoomMinimo: 15,        // abaixo disso as paradas não são desenhadas
+    maxMarcadores: 300     // teto de pontos na tela, para não pesar no celular
+  },
   mapa: {
     centro: [-23.5505, -46.6333],   // centro da cidade de São Paulo (usado se a localização falhar)
     zoom: 12,
