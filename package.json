@@ -1,0 +1,8 @@
+{
+  "name": "onibus-ao-vivo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Protótipo do TCC: ônibus de São Paulo em tempo real (site + funções Node.js na Vercel)",
+  "engines": { "node": ">=20" }
+}
