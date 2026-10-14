@@ -13,6 +13,9 @@
   var els = {};
   var camadaOnibus = null;
   var camadaSelecao = null;
+  var camadaParadasLinha = null;   // paradas por onde a linha selecionada passa
+  var paradasPorLinha = {};        // cache: código da linha -> paradas
+  var paradasDesenhadasDe = null;  // linha cujas paradas estão desenhadas agora
 
   var marcadores = {};   // prefixo do ônibus -> { marcador, popup, idadeEl, rumo }
   var historico = {};    // prefixo -> última posição usada para estimar a direção
@@ -28,6 +31,7 @@
     controlador: null,
     timer: null,
     atrasoMs: 0,
+    linhaPreferida: null,  // linha a manter selecionada ao trocar de parada
     dataServidor: NaN,     // hora do servidor (cabeçalho Date da resposta)
     recebidoEm: 0
   };
@@ -241,7 +245,47 @@
     return { raiz: raiz, idadeEl: idadeEl };
   }
 
+  // Mostra no mapa só as paradas por onde a linha selecionada passa.
+  // As paradas de cada linha são buscadas uma vez e guardadas.
+  function atualizarParadasDaLinha() {
+    var codigo = estado.codigoSelecionado;
+    if (codigo === paradasDesenhadasDe) return;
+    paradasDesenhadasDe = codigo;
+    camadaParadasLinha.clearLayers();
+    if (codigo === null || codigo === undefined) return;
+
+    if (paradasPorLinha[codigo]) {
+      desenharParadasDaLinha(codigo);
+      return;
+    }
+    fetch("api/paradas-linha?linha=" + encodeURIComponent(codigo))
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
+      .then(function (dados) {
+        paradasPorLinha[codigo] = dados.paradas || [];
+        if (estado.parada && estado.codigoSelecionado === codigo) desenharParadasDaLinha(codigo);
+      })
+      .catch(function () {
+        paradasDesenhadasDe = null;   // tenta de novo na próxima atualização
+      });
+  }
+
+  function desenharParadasDaLinha(codigo) {
+    camadaParadasLinha.clearLayers();
+    (paradasPorLinha[codigo] || []).forEach(function (p) {
+      if (!estado.parada || p.id === estado.parada.id) return;   // a escolhida já está destacada
+      if (!Number.isFinite(p.lat) || !Number.isFinite(p.lon)) return;
+      L.circleMarker([p.lat, p.lon], {
+        radius: 7, color: "#ffffff", weight: 2, fillColor: "#8B5CF6", fillOpacity: 1
+      }).on("click", function () { abrir(p, codigo); })   // tocar noutra parada da linha troca o painel
+        .addTo(camadaParadasLinha);
+    });
+  }
+
   function desenharOnibus() {
+    atualizarParadasDaLinha();
     var linha = estado.linhas.filter(function (l) { return l.codigo === estado.codigoSelecionado; })[0];
     if (!linha) { limparOnibus(); return; }
 
@@ -388,13 +432,13 @@
 
   /* ---------- Abrir e fechar ---------- */
 
-  function abrir(parada) {
+  function abrir(parada, linhaPreferida) {
     if (estado.controlador) estado.controlador.abort();
     clearTimeout(estado.timer);
 
     estado.parada = parada;
     estado.linhas = [];
-    estado.codigoSelecionado = null;
+    estado.codigoSelecionado = linhaPreferida || null;
     estado.horaReferencia = null;
     estado.erro = null;
     estado.carregando = true;
@@ -404,6 +448,8 @@
     limparOnibus();
     historico = {};
     camadaSelecao.clearLayers();
+    paradasDesenhadasDe = null;
+    atualizarParadasDaLinha();   // se já conhecemos a linha, redesenha na hora
     // A parada escolhida fica desenhada aqui (as outras somem enquanto o painel está aberto)
     L.circleMarker([parada.lat, parada.lon], {
       radius: 7, color: "#ffffff", weight: 2, fillColor: "#8B5CF6", fillOpacity: 1, interactive: false
@@ -426,6 +472,8 @@
     limparOnibus();
     historico = {};
     camadaSelecao.clearLayers();
+    camadaParadasLinha.clearLayers();
+    paradasDesenhadasDe = null;
     els.painel.classList.remove("aberto");
     medirAltura();
     avisarMudanca();
@@ -452,6 +500,7 @@
       rodape: document.getElementById("painelRodape")
     };
     camadaSelecao = L.layerGroup().addTo(mapa);
+    camadaParadasLinha = L.layerGroup().addTo(mapa);
     camadaOnibus = L.layerGroup().addTo(mapa);
 
     document.getElementById("painelFechar").addEventListener("click", fechar);
