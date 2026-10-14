@@ -9,6 +9,7 @@
   --sombra-texto: 0 1px 6px rgba(0, 0, 0, 0.85), 0 0 2px rgba(0, 0, 0, 0.9);
   --attr-bg:      rgba(21, 21, 28, 0.92);
   --attr-texto:   #c4b5fd;
+  --texto-suave:  #a1a1aa;
 }
 :root[data-theme="light"] {
   --bg-app:       #F5F3FF;
@@ -20,6 +21,7 @@
   --sombra-texto: 0 0 6px rgba(255, 255, 255, 0.95), 0 0 2px rgba(255, 255, 255, 0.95);
   --attr-bg:      rgba(255, 255, 255, 0.92);
   --attr-texto:   #3B1D7A;
+  --texto-suave:  #6b5b95;
 }
 
 * { box-sizing: border-box; }
@@ -99,7 +101,7 @@ body { position: relative; overflow: hidden; }
 .toast {
   position: absolute;
   left: 50%;
-  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(24px + var(--altura-painel, 0px) + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   max-width: min(78%, 420px);
   padding: 10px 14px;
@@ -179,4 +181,98 @@ body { position: relative; overflow: hidden; }
 
 @media (min-width: 720px) {
   .topbar { padding-left: 24px; padding-right: 24px; }
+}
+
+/* ---------- Painel de baixo (previsões) ---------- */
+.leaflet-bottom { transition: bottom 0.25s ease; }
+body.painel-aberto .leaflet-bottom { bottom: var(--altura-painel); }
+
+.painel {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  max-height: 52vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-caixa);
+  color: var(--texto-icone);
+  border-top: 1px solid var(--borda-caixa);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -6px 24px var(--sombra);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  z-index: 1200;
+  visibility: hidden;
+  transform: translateY(105%);
+  transition: transform 0.25s ease, visibility 0s linear 0.25s;
+}
+.painel.aberto {
+  visibility: visible;
+  transform: translateY(0);
+  transition: transform 0.25s ease, visibility 0s;
+}
+@media (min-width: 720px) {
+  .painel { left: 50%; right: auto; width: 460px; transform: translate(-50%, 105%); }
+  .painel.aberto { transform: translate(-50%, 0); }
+}
+
+.painel__alca {
+  width: 40px; height: 4px; margin: 8px auto 0;
+  border-radius: 2px; background: var(--borda-caixa);
+}
+.painel__topo {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; padding: 10px 16px 8px;
+}
+.painel__textos { min-width: 0; }
+.painel__titulo {
+  margin: 0; font-size: 1.05rem; font-weight: 700; line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.painel__sub { margin: 2px 0 0; font-size: 0.8rem; color: var(--texto-suave); overflow-wrap: anywhere; }
+.icon-btn--pequeno { width: 36px; height: 36px; flex: 0 0 auto; box-shadow: none; }
+
+.painel__corpo { overflow-y: auto; padding: 4px 12px 8px; -webkit-overflow-scrolling: touch; }
+.painel__aviso { margin: 14px 4px; text-align: center; color: var(--texto-suave); font-size: 0.95rem; }
+.painel__rodape { padding: 4px 16px 10px; font-size: 0.75rem; color: var(--texto-suave); }
+.painel__rodape:empty { display: none; }
+
+.linha {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 6px 0;
+  padding: 10px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--borda-caixa);
+  border-radius: 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.linha--ativa { border-color: var(--cor-marca); box-shadow: 0 0 0 1px var(--cor-marca) inset; }
+.linha__letreiro {
+  min-width: 72px; padding: 6px 8px; text-align: center;
+  font-weight: 800; font-size: 0.9rem; letter-spacing: 0.3px;
+  color: #fff; background: #8B5CF6; border-radius: 8px;
+}
+.linha__meio { display: flex; flex-direction: column; min-width: 0; }
+.linha__destino { font-weight: 600; font-size: 0.92rem; overflow-wrap: anywhere; }
+.linha__depois { font-size: 0.78rem; color: var(--texto-suave); }
+.linha__tempo { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; }
+.linha__tempo strong { font-size: 1.05rem; color: var(--cor-marca); }
+.linha__tempo small { font-size: 0.72rem; color: var(--texto-suave); }
+
+/* Ônibus no mapa */
+.bus-pin-icone { background: transparent; border: 0; }
+.bus-pin-base { position: relative; width: 0; height: 0; }
+.bus-pin {
+  position: absolute; left: 0; top: 0;
+  transform: translate(-50%, -50%);
+  padding: 3px 8px; white-space: nowrap;
+  font-weight: 800; font-size: 0.78rem; color: #fff;
+  background: #8B5CF6; border: 2px solid #fff; border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
 }

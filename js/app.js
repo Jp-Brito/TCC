@@ -75,10 +75,9 @@
   var indiceParadas = null;
   var camadaParadas = L.layerGroup().addTo(mapa);
 
-  // Por enquanto, ao tocar numa parada só mostramos o nome.
-  // O painel com as previsões de chegada entra na próxima etapa.
+  // Ao tocar numa parada, abre o painel com as previsões de chegada
   function aoSelecionarParada(parada) {
-    mostrarAviso(parada.nome + " (parada " + parada.id + ")");
+    Painel.abrir(parada);
   }
 
   function desenharParadas() {
@@ -117,6 +116,8 @@
     var dLon = parada.lon - centro.lng;
     return dLat * dLat + dLon * dLon;
   }
+
+  Painel.iniciar(mapa, cfg);
 
   mapa.on("moveend", desenharParadas);
 
