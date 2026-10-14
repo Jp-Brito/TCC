@@ -117,7 +117,7 @@
     return dLat * dLat + dLon * dLon;
   }
 
-  Painel.iniciar(mapa, cfg);
+  Painel.iniciar(mapa, cfg, function () { return indiceParadas; });
 
   mapa.on("moveend", desenharParadas);
 

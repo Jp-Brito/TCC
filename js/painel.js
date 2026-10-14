@@ -1,5 +1,6 @@
 // Painel que sobe de baixo ao tocar numa parada: mostra as linhas que passam
-// ali, a previsão de chegada de cada uma e, no mapa, onde o ônibus está agora.
+// ali, a previsão de chegada de cada uma e, no mapa, onde cada ônibus está.
+// Tocar na setinha de um ônibus abre um pop-up com as informações dele.
 //
 // Os dados vêm da nossa função /api/previsao e se atualizam sozinhos enquanto
 // o painel estiver aberto.
@@ -8,9 +9,13 @@
 
   var mapa = null;
   var cfg = null;
+  var obterIndice = function () { return null; };
   var els = {};
   var camadaOnibus = null;
   var camadaSelecao = null;
+
+  var marcadores = {};   // prefixo do ônibus -> { marcador, popup, idadeEl, rumo }
+  var historico = {};    // prefixo -> última posição usada para estimar a direção
 
   var estado = {
     parada: null,          // parada aberta
@@ -22,7 +27,9 @@
     ajustarMapa: false,    // true = na próxima atualização, enquadrar parada + ônibus
     controlador: null,
     timer: null,
-    atrasoMs: 0
+    atrasoMs: 0,
+    dataServidor: NaN,     // hora do servidor (cabeçalho Date da resposta)
+    recebidoEm: 0
   };
 
   /* ---------- Funções de apoio (também usadas nos testes) ---------- */
@@ -46,6 +53,42 @@
     return min <= 0 ? "Chegando" : min + " min";
   }
 
+  // Distância em metros entre dois pontos {lat, lon} (aproximação para distâncias curtas)
+  function distanciaM(a, b) {
+    var dy = (b.lat - a.lat) * 111320;
+    var dx = (b.lon - a.lon) * 111320 * Math.cos(a.lat * Math.PI / 180);
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  // Direção (0 = norte, 90 = leste...) do ponto a até o ponto b, em graus
+  function rumoEntre(a, b) {
+    var rad = Math.PI / 180;
+    var dLon = (b.lon - a.lon) * rad;
+    var y = Math.sin(dLon) * Math.cos(b.lat * rad);
+    var x = Math.cos(a.lat * rad) * Math.sin(b.lat * rad) -
+            Math.sin(a.lat * rad) * Math.cos(b.lat * rad) * Math.cos(dLon);
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  }
+
+  function textoIdade(segundos) {
+    if (segundos === null) return "—";
+    if (segundos < 5) return "agora";
+    if (segundos < 60) return "há " + segundos + " s";
+    if (segundos < 3600) return "há " + Math.floor(segundos / 60) + " min";
+    return "há " + Math.floor(segundos / 3600) + " h";
+  }
+
+  // Há quantos segundos a posição foi enviada pelo ônibus.
+  // "Agora" vem do servidor (cabeçalho Date), não do relógio do celular.
+  function idadeSegundos(atualizadoEm) {
+    var quando = Date.parse(atualizadoEm);
+    if (!Number.isFinite(quando)) return null;
+    var agora = Number.isFinite(estado.dataServidor)
+      ? estado.dataServidor + (performance.now() - estado.recebidoEm)
+      : Date.now();
+    return Math.max(0, Math.round((agora - quando) / 1000));
+  }
+
   // Transforma a resposta da API numa lista pronta para mostrar.
   function processar(dados) {
     var ref = dados.horaReferencia;
@@ -53,7 +96,8 @@
       var veiculos = (l.veiculos || []).map(function (v) {
         return {
           prefixo: v.prefixo, chegada: v.chegada, acessivel: v.acessivel,
-          lat: v.lat, lon: v.lon, minutos: minutosAte(v.chegada, ref)
+          atualizadoEm: v.atualizadoEm, lat: v.lat, lon: v.lon,
+          minutos: minutosAte(v.chegada, ref)
         };
       }).filter(function (v) { return v.minutos !== null; })
         .sort(function (a, b) { return a.minutos - b.minutos; });
@@ -129,6 +173,7 @@
     botao.appendChild(tempo);
 
     botao.addEventListener("click", function () {
+      if (estado.codigoSelecionado !== linha.codigo) limparOnibus();
       estado.codigoSelecionado = linha.codigo;
       estado.ajustarMapa = true;
       renderizar();
@@ -137,26 +182,123 @@
     return botao;
   }
 
-  /* ---------- Ônibus no mapa ---------- */
+  /* ---------- Ônibus no mapa (setinha + pop-up) ---------- */
+
+  function limparOnibus() {
+    camadaOnibus.clearLayers();
+    marcadores = {};
+  }
+
+  // Ícone: círculo roxo com uma seta. Sem direção conhecida, mostra só um ponto.
+  function criarIcone(rumo) {
+    var temRumo = rumo !== null;
+    var html = temRumo
+      ? '<div class="seta"><svg viewBox="0 0 24 24" width="22" height="22" style="transform: rotate(' +
+        Math.round(rumo) + 'deg)"><path d="M12 3 L19 20 L12 16 L5 20 Z" fill="#fff"></path></svg></div>'
+      : '<div class="seta seta--sem-rumo"><span></span></div>';
+    return L.divIcon({ className: "seta-icone", html: html, iconSize: [34, 34], iconAnchor: [17, 17] });
+  }
+
+  // Estima a direção do ônibus pelo deslocamento desde a última posição conhecida
+  function atualizarRumo(veiculo) {
+    var anterior = historico[veiculo.prefixo];
+    var atual = { lat: veiculo.lat, lon: veiculo.lon };
+    if (!anterior) {
+      historico[veiculo.prefixo] = { lat: atual.lat, lon: atual.lon, rumo: null };
+      return null;
+    }
+    if (distanciaM(anterior, atual) >= 10) {      // andou o bastante para saber a direção
+      anterior.rumo = rumoEntre(anterior, atual);
+      anterior.lat = atual.lat;
+      anterior.lon = atual.lon;
+    }
+    return anterior.rumo;
+  }
+
+  function conteudoPopup(linha, veiculo) {
+    var raiz = el("div", "popup-onibus");
+    raiz.appendChild(el("strong", "popup-onibus__titulo", linha.letreiro));
+    raiz.appendChild(el("div", "popup-onibus__linha", "Sentido: " + (linha.destino || "—")));
+
+    var idade = el("div", "popup-onibus__linha");
+    idade.appendChild(document.createTextNode("Atualizado "));
+    var idadeEl = el("b", "", textoIdade(idadeSegundos(veiculo.atualizadoEm)));
+    idade.appendChild(idadeEl);
+    raiz.appendChild(idade);
+
+    // Localização: parada mais próxima (se houver) e coordenadas
+    var indice = obterIndice();
+    var perto = indice ? indice.maisProxima(veiculo.lat, veiculo.lon, 300) : null;
+    if (perto) {
+      var metros = Math.max(10, Math.round(perto.metros / 10) * 10);
+      raiz.appendChild(el("div", "popup-onibus__linha", "Perto de: " + perto.parada.nome + " (" + metros + " m)"));
+    }
+    raiz.appendChild(el("div", "popup-onibus__coord",
+      veiculo.lat.toFixed(5) + ", " + veiculo.lon.toFixed(5)));
+    raiz.appendChild(el("div", "popup-onibus__coord",
+      "Prefixo " + veiculo.prefixo + (veiculo.acessivel ? " · acessível" : "")));
+
+    return { raiz: raiz, idadeEl: idadeEl };
+  }
 
   function desenharOnibus() {
-    camadaOnibus.clearLayers();
     var linha = estado.linhas.filter(function (l) { return l.codigo === estado.codigoSelecionado; })[0];
-    if (!linha) return;
+    if (!linha) { limparOnibus(); return; }
 
     var pontos = [[estado.parada.lat, estado.parada.lon]];
+    var presentes = {};
+
     linha.veiculos.forEach(function (v) {
       if (!Number.isFinite(v.lat) || !Number.isFinite(v.lon)) return;
-      var pino = el("div", "bus-pin", linha.letreiro);
-      var base = el("div", "bus-pin-base");
-      base.appendChild(pino);
-      L.marker([v.lat, v.lon], {
-        icon: L.divIcon({ className: "bus-pin-icone", html: base, iconSize: [0, 0] }),
-        interactive: false,
+      presentes[v.prefixo] = true;
+      pontos.push([v.lat, v.lon]);
+
+      var rumo = atualizarRumo(v);
+      var conteudo = conteudoPopup(linha, v);
+      var existente = marcadores[v.prefixo];
+
+      if (existente) {
+        existente.marcador.setLatLng([v.lat, v.lon]);
+        if (existente.rumo !== (rumo === null ? null : Math.round(rumo))) {
+          existente.marcador.setIcon(criarIcone(rumo));
+          existente.rumo = rumo === null ? null : Math.round(rumo);
+        }
+        existente.popup.setContent(conteudo.raiz);   // atualiza sem fechar o pop-up
+        existente.idadeEl = conteudo.idadeEl;
+        return;
+      }
+
+      var marcador = L.marker([v.lat, v.lon], {
+        icon: criarIcone(rumo),
         keyboard: false,
         zIndexOffset: 500
       }).addTo(camadaOnibus);
-      pontos.push([v.lat, v.lon]);
+
+      // Antes de abrir o pop-up, reserva espaço para o painel de baixo
+      marcador.on("click", function () {
+        popup.options.autoPanPaddingBottomRight = [20, medirAltura() + 20];
+      });
+      var popup = L.popup({
+        className: "popup-tema",
+        autoPanPaddingTopLeft: [20, 90],
+        autoPanPaddingBottomRight: [20, medirAltura() + 20],
+        offset: [0, -8],
+        closeButton: true
+      }).setContent(conteudo.raiz);
+      marcador.bindPopup(popup);
+
+      marcadores[v.prefixo] = {
+        marcador: marcador, popup: popup, idadeEl: conteudo.idadeEl,
+        rumo: rumo === null ? null : Math.round(rumo)
+      };
+    });
+
+    // Remove ônibus que saíram da lista
+    Object.keys(marcadores).forEach(function (prefixo) {
+      if (!presentes[prefixo]) {
+        camadaOnibus.removeLayer(marcadores[prefixo].marcador);
+        delete marcadores[prefixo];
+      }
     });
 
     if (estado.ajustarMapa && pontos.length > 1) {
@@ -167,6 +309,18 @@
         maxZoom: 17
       });
     }
+  }
+
+  // A cada segundo, atualiza o "há N s" do pop-up que estiver aberto
+  function atualizarIdades() {
+    var linha = estado.linhas.filter(function (l) { return l.codigo === estado.codigoSelecionado; })[0];
+    if (!linha) return;
+    linha.veiculos.forEach(function (v) {
+      var m = marcadores[v.prefixo];
+      if (m && m.marcador.isPopupOpen()) {
+        m.idadeEl.textContent = textoIdade(idadeSegundos(v.atualizadoEm));
+      }
+    });
   }
 
   // Garante que a parada não fique escondida atrás do painel
@@ -198,6 +352,8 @@
     fetch("api/previsao?parada=" + encodeURIComponent(id), { signal: controlador.signal })
       .then(function (r) {
         if (!r.ok) throw new Error("HTTP " + r.status);
+        estado.dataServidor = Date.parse(r.headers.get("Date"));
+        estado.recebidoEm = performance.now();
         return r.json();
       })
       .then(function (dados) {
@@ -210,6 +366,7 @@
 
         var existe = estado.linhas.some(function (l) { return l.codigo === estado.codigoSelecionado; });
         if (!existe) {
+          limparOnibus();
           estado.codigoSelecionado = estado.linhas.length ? estado.linhas[0].codigo : null;
           estado.ajustarMapa = true;
         }
@@ -244,7 +401,8 @@
     estado.ajustarMapa = false;
     estado.atrasoMs = cfg.painel.atualizacaoMs;
 
-    camadaOnibus.clearLayers();
+    limparOnibus();
+    historico = {};
     camadaSelecao.clearLayers();
     L.circleMarker([parada.lat, parada.lon], {
       radius: 12, color: "#8B5CF6", weight: 3, fill: false, interactive: false
@@ -260,15 +418,17 @@
     if (estado.controlador) estado.controlador.abort();
     clearTimeout(estado.timer);
     estado.parada = null;
-    camadaOnibus.clearLayers();
+    limparOnibus();
+    historico = {};
     camadaSelecao.clearLayers();
     els.painel.classList.remove("aberto");
     medirAltura();
   }
 
-  function iniciar(mapaLeaflet, configuracao) {
+  function iniciar(mapaLeaflet, configuracao, funcaoIndice) {
     mapa = mapaLeaflet;
     cfg = configuracao;
+    if (typeof funcaoIndice === "function") obterIndice = funcaoIndice;
     els = {
       painel: document.getElementById("painel"),
       titulo: document.getElementById("painelTitulo"),
@@ -282,6 +442,7 @@
     document.getElementById("painelFechar").addEventListener("click", fechar);
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") fechar(); });
     window.addEventListener("resize", medirAltura);
+    setInterval(atualizarIdades, 1000);
 
     // Ao voltar para a aba, atualiza na hora
     document.addEventListener("visibilitychange", function () {
@@ -293,6 +454,9 @@
     iniciar: iniciar,
     abrir: abrir,
     fechar: fechar,
-    _teste: { paraMinutos: paraMinutos, minutosAte: minutosAte, textoTempo: textoTempo, processar: processar }
+    _teste: {
+      paraMinutos: paraMinutos, minutosAte: minutosAte, textoTempo: textoTempo,
+      processar: processar, distanciaM: distanciaM, rumoEntre: rumoEntre, textoIdade: textoIdade
+    }
   };
 })();

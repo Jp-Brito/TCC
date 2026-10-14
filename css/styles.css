@@ -265,14 +265,31 @@ body.painel-aberto .leaflet-bottom { bottom: var(--altura-painel); }
 .linha__tempo strong { font-size: 1.05rem; color: var(--cor-marca); }
 .linha__tempo small { font-size: 0.72rem; color: var(--texto-suave); }
 
-/* Ônibus no mapa */
-.bus-pin-icone { background: transparent; border: 0; }
-.bus-pin-base { position: relative; width: 0; height: 0; }
-.bus-pin {
-  position: absolute; left: 0; top: 0;
-  transform: translate(-50%, -50%);
-  padding: 3px 8px; white-space: nowrap;
-  font-weight: 800; font-size: 0.78rem; color: #fff;
-  background: #8B5CF6; border: 2px solid #fff; border-radius: 999px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+/* Ônibus no mapa: setinha */
+.seta-icone { background: transparent; border: 0; }
+.seta {
+  width: 34px; height: 34px;
+  display: grid; place-items: center;
+  background: #8B5CF6;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
 }
+.seta svg { display: block; transition: transform 0.4s ease; }
+.seta--sem-rumo span { width: 10px; height: 10px; border-radius: 50%; background: #fff; }
+
+/* Pop-up do ônibus (segue o tema) */
+.popup-tema .leaflet-popup-content-wrapper,
+.popup-tema .leaflet-popup-tip {
+  background: var(--bg-caixa);
+  color: var(--texto-icone);
+  box-shadow: 0 4px 16px var(--sombra);
+}
+.popup-tema .leaflet-popup-content-wrapper { border: 1px solid var(--borda-caixa); border-radius: 12px; }
+.popup-tema .leaflet-popup-content { margin: 12px 30px 12px 14px; font: inherit; line-height: 1.35; }
+.popup-tema a.leaflet-popup-close-button { color: var(--texto-suave); }
+.popup-onibus { min-width: 180px; max-width: 240px; }
+.popup-onibus__titulo { display: block; font-size: 1.05rem; color: var(--cor-marca); margin-bottom: 4px; }
+.popup-onibus__linha { font-size: 0.88rem; margin-top: 2px; overflow-wrap: anywhere; }
+.popup-onibus__coord { font-size: 0.72rem; color: var(--texto-suave); margin-top: 3px; }

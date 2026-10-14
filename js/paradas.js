@@ -50,6 +50,29 @@
     return resultado;
   };
 
+  // Parada mais próxima de um ponto, dentro de um raio (em metros).
+  // Devolve { parada, metros } ou null se não houver nenhuma por perto.
+  IndiceParadas.prototype.maisProxima = function (lat, lon, raioMetros) {
+    var graus = raioMetros / 111320;
+    var y0 = Math.floor((lat - graus) / CELULA), y1 = Math.floor((lat + graus) / CELULA);
+    var x0 = Math.floor((lon - graus * 1.2) / CELULA), x1 = Math.floor((lon + graus * 1.2) / CELULA);
+    var cosLat = Math.cos(lat * Math.PI / 180);
+    var melhor = null, menor = Infinity;
+    for (var y = y0; y <= y1; y++) {
+      for (var x = x0; x <= x1; x++) {
+        var grupo = this.celulas[y + ":" + x];
+        if (!grupo) continue;
+        for (var j = 0; j < grupo.length; j++) {
+          var dy = (grupo[j].lat - lat) * 111320;
+          var dx = (grupo[j].lon - lon) * 111320 * cosLat;
+          var d = Math.sqrt(dx * dx + dy * dy);
+          if (d < menor) { menor = d; melhor = grupo[j]; }
+        }
+      }
+    }
+    return melhor && menor <= raioMetros ? { parada: melhor, metros: menor } : null;
+  };
+
   function carregar(url) {
     return fetch(url).then(function (resposta) {
       if (!resposta.ok) throw new Error("Não foi possível carregar " + url);
