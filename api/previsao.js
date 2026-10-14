@@ -1,6 +1,7 @@
 // GET /api/previsao?parada=700016623
 // Linhas que passam numa parada, com a previsão de chegada de cada ônibus.
 import { consultarComLogin, enviarJson, tratarErro, exigirGet } from "../lib/olhovivo.js";
+import { corDaLinha } from "../lib/gtfs.js";   // cor da linha, lida do routes.txt
 
 export default async function handler(req, res) {
   if (!exigirGet(req, res)) return;
@@ -17,6 +18,7 @@ export default async function handler(req, res) {
     const linhas = (p?.l ?? []).map((l) => ({
       codigo: l.cl,
       letreiro: l.c,
+      cor: corDaLinha(l.c),    // cor de fundo em hexadecimal, ou null
       sentido: l.sl,
       destino: l.lt0,
       origem: l.lt1,
