@@ -404,11 +404,16 @@
     limparOnibus();
     historico = {};
     camadaSelecao.clearLayers();
+    // A parada escolhida fica desenhada aqui (as outras somem enquanto o painel está aberto)
     L.circleMarker([parada.lat, parada.lon], {
-      radius: 12, color: "#8B5CF6", weight: 3, fill: false, interactive: false
+      radius: 7, color: "#ffffff", weight: 2, fillColor: "#8B5CF6", fillOpacity: 1, interactive: false
+    }).addTo(camadaSelecao);
+    L.circleMarker([parada.lat, parada.lon], {
+      radius: 13, color: "#8B5CF6", weight: 3, fill: false, interactive: false
     }).addTo(camadaSelecao);
 
     els.painel.classList.add("aberto");
+    avisarMudanca();
     renderizar();
     mostrarParadaAcima();
     buscar();
@@ -423,6 +428,16 @@
     camadaSelecao.clearLayers();
     els.painel.classList.remove("aberto");
     medirAltura();
+    avisarMudanca();
+  }
+
+  function estaAberto() {
+    return estado.parada !== null;
+  }
+
+  // Avisa o resto do app que o painel abriu ou fechou (o mapa esconde ou mostra as paradas)
+  function avisarMudanca() {
+    document.dispatchEvent(new CustomEvent("painel:mudou"));
   }
 
   function iniciar(mapaLeaflet, configuracao, funcaoIndice) {
@@ -454,6 +469,7 @@
     iniciar: iniciar,
     abrir: abrir,
     fechar: fechar,
+    estaAberto: estaAberto,
     _teste: {
       paraMinutos: paraMinutos, minutosAte: minutosAte, textoTempo: textoTempo,
       processar: processar, distanciaM: distanciaM, rumoEntre: rumoEntre, textoIdade: textoIdade

@@ -82,7 +82,8 @@
 
   function desenharParadas() {
     camadaParadas.clearLayers();
-    if (!indiceParadas || mapa.getZoom() < cfg.paradas.zoomMinimo) return;
+    // Com o painel aberto, só a parada escolhida fica no mapa
+    if (!indiceParadas || Painel.estaAberto() || mapa.getZoom() < cfg.paradas.zoomMinimo) return;
 
     var area = mapa.getBounds();
     var centro = mapa.getCenter();
@@ -118,6 +119,11 @@
   }
 
   Painel.iniciar(mapa, cfg, function () { return indiceParadas; });
+
+  // Painel abriu: esconde as outras paradas. Painel fechou: elas voltam.
+  document.addEventListener("painel:mudou", function () {
+    setTimeout(desenharParadas, 0);
+  });
 
   mapa.on("moveend", desenharParadas);
 
