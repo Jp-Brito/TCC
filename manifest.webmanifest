@@ -1,6 +1,6 @@
 {
-  "name": "BusJP",
-  "short_name": "BusJP",
+  "name": "Ônibus ao Vivo SP",
+  "short_name": "OVSP",
   "description": "Acompanhe os ônibus de São Paulo em tempo real no mapa.",
   "lang": "pt-BR",
   "start_url": "./",

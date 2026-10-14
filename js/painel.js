@@ -13,9 +13,12 @@
   var els = {};
   var camadaOnibus = null;
   var camadaSelecao = null;
+  var camadaTracado = null;        // traçado (caminho) da linha selecionada
   var camadaParadasLinha = null;   // paradas por onde a linha selecionada passa
   var paradasPorLinha = {};        // cache: código da linha -> paradas
   var paradasDesenhadasDe = null;  // linha cujas paradas estão desenhadas agora
+  var tracadosCache = {};          // código da linha -> pontos do traçado
+  var tracadoDesenhadoDe = null;   // linha cujo traçado está desenhado agora
   var vazias = {};                 // quantas vezes a API devolveu zero paradas para cada linha
 
   var marcadores = {};   // prefixo do ônibus -> { marcador, popup, idadeEl, rumo }
@@ -34,6 +37,7 @@
     atrasoMs: 0,
     linhaPreferida: null,  // linha a manter selecionada ao trocar de parada
     infoParadas: null,     // { codigo, total } paradas da linha selecionada, para o rodapé
+    infoTracado: null,     // { total } pontos do traçado da linha selecionada, para o rodapé
     dataServidor: NaN,     // hora do servidor (cabeçalho Date da resposta)
     recebidoEm: 0
   };
@@ -107,7 +111,7 @@
         };
       }).filter(function (v) { return v.minutos !== null; })
         .sort(function (a, b) { return a.minutos - b.minutos; });
-      return { codigo: l.codigo, letreiro: l.letreiro, destino: l.destino, cor: l.cor, veiculos: veiculos };
+      return { codigo: l.codigo, letreiro: l.letreiro, destino: l.destino, sentido: l.sentido, cor: l.cor, veiculos: veiculos };
     }).filter(function (l) { return l.veiculos.length > 0; })
       .sort(function (a, b) { return a.veiculos[0].minutos - b.veiculos[0].minutos; });
   }
@@ -171,6 +175,9 @@
         (estado.infoParadas.total > 0
           ? estado.infoParadas.total + " paradas"
           : "a API não devolveu paradas");
+    }
+    if (estado.infoTracado) {
+      rodape += " · traçado: " + (estado.infoTracado.total > 0 ? estado.infoTracado.total + " pontos" : "indisponível");
     }
     els.rodape.textContent = rodape;
 
@@ -325,9 +332,82 @@
     });
   }
 
+  /* ---------- Traçado da linha ---------- */
+
+  // Decodifica a "polilinha codificada" enviada pelo servidor: uma lista de pontos
+  // em que cada número é só a diferença para o anterior (em unidades de 0,00001 grau).
+  function decodificarPolilinha(texto) {
+    var pontos = [], i = 0, lat = 0, lon = 0;
+    while (i < texto.length) {
+      for (var eixo = 0; eixo < 2; eixo++) {
+        var resultado = 0, deslocamento = 0, byte;
+        do {
+          byte = texto.charCodeAt(i++) - 63;
+          resultado |= (byte & 0x1f) << deslocamento;
+          deslocamento += 5;
+        } while (byte >= 0x20);
+        var delta = (resultado & 1) ? ~(resultado >> 1) : (resultado >> 1);
+        if (eixo === 0) lat += delta; else lon += delta;
+      }
+      pontos.push([lat / 1e5, lon / 1e5]);
+    }
+    return pontos;
+  }
+
+  // Desenha o caminho na cor da linha, com um contorno branco para destacar no mapa
+  function desenharTracado(linha, pontos) {
+    camadaTracado.clearLayers();
+    var cor = corDaLinha(linha.cor);
+    var opcoes = { interactive: false, lineJoin: "round", lineCap: "round" };
+    L.polyline(pontos, Object.assign({ color: "#ffffff", weight: 8, opacity: 0.85 }, opcoes)).addTo(camadaTracado);
+    L.polyline(pontos, Object.assign({ color: "#" + cor.fundo, weight: 5, opacity: 1 }, opcoes)).addTo(camadaTracado);
+  }
+
+  // Busca o traçado da linha selecionada (uma vez por linha; depois fica guardado)
+  function atualizarTracado(linha) {
+    var codigo = linha ? linha.codigo : null;
+    if (codigo === tracadoDesenhadoDe) return;
+    tracadoDesenhadoDe = codigo;
+    camadaTracado.clearLayers();
+    estado.infoTracado = null;
+    if (!linha) return;
+
+    if (tracadosCache[codigo]) {
+      estado.infoTracado = { total: tracadosCache[codigo].length };
+      desenharTracado(linha, tracadosCache[codigo]);
+      return;
+    }
+    var url = "api/tracado?linha=" + encodeURIComponent(linha.letreiro) +
+      "&destino=" + encodeURIComponent(linha.destino || "") +
+      "&sentido=" + encodeURIComponent(linha.sentido || "");
+    fetch(url)
+      .then(function (r) {
+        if (r.status === 404) return null;            // linha sem traçado no GTFS
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
+      .then(function (dados) {
+        if (!estado.parada || estado.codigoSelecionado !== codigo) return;
+        if (!dados) {
+          estado.infoTracado = { total: 0 };
+        } else {
+          var pontos = decodificarPolilinha(dados.polilinha);
+          console.info("Traçado da linha " + linha.letreiro + ": " + pontos.length + " pontos (escolhido por " + dados.criterio + ")");
+          tracadosCache[codigo] = pontos;
+          estado.infoTracado = { total: pontos.length };
+          desenharTracado(linha, pontos);
+        }
+        renderizar();
+      })
+      .catch(function () {
+        tracadoDesenhadoDe = null;                    // tenta de novo na próxima atualização
+      });
+  }
+
   function desenharOnibus() {
     atualizarParadasDaLinha();
     var linha = estado.linhas.filter(function (l) { return l.codigo === estado.codigoSelecionado; })[0];
+    atualizarTracado(linha);
     if (!linha) { limparOnibus(); return; }
 
     var pontos = [[estado.parada.lat, estado.parada.lon]];
@@ -491,6 +571,7 @@
     camadaSelecao.clearLayers();
     paradasDesenhadasDe = null;
     atualizarParadasDaLinha();   // se já conhecemos a linha, redesenha na hora
+    if (!linhaPreferida) { camadaTracado.clearLayers(); tracadoDesenhadoDe = null; estado.infoTracado = null; }
     // A parada escolhida fica desenhada aqui (as outras somem enquanto o painel está aberto)
     L.circleMarker([parada.lat, parada.lon], {
       radius: 7, color: "#ffffff", weight: 2, fillColor: "#8B5CF6", fillOpacity: 1, interactive: false
@@ -515,6 +596,8 @@
     camadaSelecao.clearLayers();
     camadaParadasLinha.clearLayers();
     paradasDesenhadasDe = null;
+    camadaTracado.clearLayers();
+    tracadoDesenhadoDe = null;
     els.painel.classList.remove("aberto");
     medirAltura();
     avisarMudanca();
@@ -541,6 +624,7 @@
       rodape: document.getElementById("painelRodape")
     };
     camadaSelecao = L.layerGroup().addTo(mapa);
+    camadaTracado = L.layerGroup().addTo(mapa);         // embaixo das paradas e dos ônibus
     camadaParadasLinha = L.layerGroup().addTo(mapa);
     camadaOnibus = L.layerGroup().addTo(mapa);
 
@@ -562,7 +646,7 @@
     estaAberto: estaAberto,
     _teste: {
       paraMinutos: paraMinutos, minutosAte: minutosAte, textoTempo: textoTempo,
-      processar: processar, distanciaM: distanciaM, rumoEntre: rumoEntre, textoIdade: textoIdade
+      processar: processar, decodificarPolilinha: decodificarPolilinha, distanciaM: distanciaM, rumoEntre: rumoEntre, textoIdade: textoIdade
     }
   };
 })();

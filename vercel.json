@@ -26,6 +26,9 @@
   "functions": {
     "api/previsao.js": {
       "includeFiles": "data/gtfs/routes.txt"
+    },
+    "api/tracado.js": {
+      "includeFiles": "data/tracados.json"
     }
   }
 }
