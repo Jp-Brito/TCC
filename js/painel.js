@@ -16,6 +16,7 @@
   var camadaParadasLinha = null;   // paradas por onde a linha selecionada passa
   var paradasPorLinha = {};        // cache: código da linha -> paradas
   var paradasDesenhadasDe = null;  // linha cujas paradas estão desenhadas agora
+  var vazias = {};                 // quantas vezes a API devolveu zero paradas para cada linha
 
   var marcadores = {};   // prefixo do ônibus -> { marcador, popup, idadeEl, rumo }
   var historico = {};    // prefixo -> última posição usada para estimar a direção
@@ -32,6 +33,7 @@
     timer: null,
     atrasoMs: 0,
     linhaPreferida: null,  // linha a manter selecionada ao trocar de parada
+    infoParadas: null,     // { codigo, total } paradas da linha selecionada, para o rodapé
     dataServidor: NaN,     // hora do servidor (cabeçalho Date da resposta)
     recebidoEm: 0
   };
@@ -105,9 +107,25 @@
         };
       }).filter(function (v) { return v.minutos !== null; })
         .sort(function (a, b) { return a.minutos - b.minutos; });
-      return { codigo: l.codigo, letreiro: l.letreiro, destino: l.destino, veiculos: veiculos };
+      return { codigo: l.codigo, letreiro: l.letreiro, destino: l.destino, cor: l.cor, veiculos: veiculos };
     }).filter(function (l) { return l.veiculos.length > 0; })
       .sort(function (a, b) { return a.veiculos[0].minutos - b.veiculos[0].minutos; });
+  }
+
+  // Cor oficial da linha (do GTFS). Se não houver, usa o roxo do app.
+  var COR_PADRAO = { fundo: "8B5CF6", texto: "FFFFFF" };
+  var HEX = /^[0-9A-Fa-f]{6}$/;
+
+  function corDaLinha(hex) {
+    var c = hex ? [hex] : null;
+    if (c && HEX.test(c[0])) {
+      // Texto preto em fundos claros (amarelo, laranja) e branco nos escuros,
+      // calculado pelo brilho da cor, para sempre ficar legível.
+      var r = parseInt(c[0].slice(0, 2), 16), g = parseInt(c[0].slice(2, 4), 16), b = parseInt(c[0].slice(4, 6), 16);
+      var brilho = 0.299 * r + 0.587 * g + 0.114 * b;
+      return { fundo: c[0], texto: brilho > 135 ? "000000" : "FFFFFF" };
+    }
+    return COR_PADRAO;
   }
 
   function el(tag, classe, texto) {
@@ -148,6 +166,12 @@
 
     var rodape = estado.horaReferencia ? "Atualizado às " + estado.horaReferencia : "";
     if (estado.erro && estado.linhas.length > 0) rodape += " · " + estado.erro;
+    if (estado.infoParadas) {
+      rodape += " · linha " + estado.infoParadas.codigo + ": " +
+        (estado.infoParadas.total > 0
+          ? estado.infoParadas.total + " paradas"
+          : "a API não devolveu paradas");
+    }
     els.rodape.textContent = rodape;
 
     medirAltura();
@@ -161,7 +185,11 @@
     if (selecionada) botao.classList.add("linha--ativa");
     botao.setAttribute("aria-pressed", selecionada ? "true" : "false");
 
-    botao.appendChild(el("span", "linha__letreiro", linha.letreiro));
+    var corLinha = corDaLinha(linha.cor);
+    var etiqueta = el("span", "linha__letreiro", linha.letreiro);
+    etiqueta.style.background = "#" + corLinha.fundo;
+    etiqueta.style.color = "#" + corLinha.texto;
+    botao.appendChild(etiqueta);
 
     var meio = el("span", "linha__meio");
     meio.appendChild(el("span", "linha__destino", linha.destino || ""));
@@ -193,13 +221,14 @@
     marcadores = {};
   }
 
-  // Ícone: círculo roxo com uma seta. Sem direção conhecida, mostra só um ponto.
-  function criarIcone(rumo) {
-    var temRumo = rumo !== null;
-    var html = temRumo
-      ? '<div class="seta"><svg viewBox="0 0 24 24" width="22" height="22" style="transform: rotate(' +
-        Math.round(rumo) + 'deg)"><path d="M12 3 L19 20 L12 16 L5 20 Z" fill="#fff"></path></svg></div>'
-      : '<div class="seta seta--sem-rumo"><span></span></div>';
+  // Ícone: círculo na cor da linha com uma seta. Sem direção conhecida, mostra só um ponto.
+  // (As cores já foram conferidas como hexadecimal em corDaLinha, então são seguras no HTML.)
+  function criarIcone(rumo, cor) {
+    var fundo = 'style="background:#' + cor.fundo + '"';
+    var html = rumo !== null
+      ? '<div class="seta" ' + fundo + '><svg viewBox="0 0 24 24" width="22" height="22" style="transform: rotate(' +
+        Math.round(rumo) + 'deg)"><path d="M12 3 L19 20 L12 16 L5 20 Z" fill="#' + cor.texto + '"></path></svg></div>'
+      : '<div class="seta seta--sem-rumo" ' + fundo + '><span style="background:#' + cor.texto + '"></span></div>';
     return L.divIcon({ className: "seta-icone", html: html, iconSize: [34, 34], iconAnchor: [17, 17] });
   }
 
@@ -252,9 +281,11 @@
     if (codigo === paradasDesenhadasDe) return;
     paradasDesenhadasDe = codigo;
     camadaParadasLinha.clearLayers();
+    estado.infoParadas = null;
     if (codigo === null || codigo === undefined) return;
 
     if (paradasPorLinha[codigo]) {
+      estado.infoParadas = { codigo: codigo, total: paradasPorLinha[codigo].length };
       desenharParadasDaLinha(codigo);
       return;
     }
@@ -264,8 +295,18 @@
         return r.json();
       })
       .then(function (dados) {
-        paradasPorLinha[codigo] = dados.paradas || [];
-        if (estado.parada && estado.codigoSelecionado === codigo) desenharParadasDaLinha(codigo);
+        var lista = dados.paradas || [];
+        console.info("Paradas da linha " + codigo + ": " + lista.length);
+        if (!estado.parada || estado.codigoSelecionado !== codigo) return;
+        estado.infoParadas = { codigo: codigo, total: lista.length };
+        if (lista.length > 0) {
+          paradasPorLinha[codigo] = lista;      // só guarda resposta com paradas
+          desenharParadasDaLinha(codigo);
+        } else {
+          vazias[codigo] = (vazias[codigo] || 0) + 1;
+          if (vazias[codigo] < 3) paradasDesenhadasDe = null;   // tenta de novo (até 3 vezes)
+        }
+        renderizar();
       })
       .catch(function () {
         paradasDesenhadasDe = null;   // tenta de novo na próxima atualização
@@ -304,7 +345,7 @@
       if (existente) {
         existente.marcador.setLatLng([v.lat, v.lon]);
         if (existente.rumo !== (rumo === null ? null : Math.round(rumo))) {
-          existente.marcador.setIcon(criarIcone(rumo));
+          existente.marcador.setIcon(criarIcone(rumo, corDaLinha(linha.cor)));
           existente.rumo = rumo === null ? null : Math.round(rumo);
         }
         existente.popup.setContent(conteudo.raiz);   // atualiza sem fechar o pop-up
@@ -313,7 +354,7 @@
       }
 
       var marcador = L.marker([v.lat, v.lon], {
-        icon: criarIcone(rumo),
+        icon: criarIcone(rumo, corDaLinha(linha.cor)),
         keyboard: false,
         zIndexOffset: 500
       }).addTo(camadaOnibus);
