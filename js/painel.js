@@ -173,7 +173,7 @@
     if (estado.infoParadas) {
       rodape += " · linha " + estado.infoParadas.codigo + ": " +
         (estado.infoParadas.total > 0
-          ? estado.infoParadas.total + " paradas"
+          ? estado.infoParadas.total + " paradas" + (estado.infoParadas.fonte === "previsao" ? " (via previsão)" : "")
           : "a API não devolveu paradas");
     }
     if (estado.infoTracado) {
@@ -292,8 +292,8 @@
     if (codigo === null || codigo === undefined) return;
 
     if (paradasPorLinha[codigo]) {
-      estado.infoParadas = { codigo: codigo, total: paradasPorLinha[codigo].length };
-      desenharParadasDaLinha(codigo);
+      estado.infoParadas = { codigo: codigo, total: paradasPorLinha[codigo].length, fonte: "paradas" };
+      desenharParadasDaLinha(codigo, paradasPorLinha[codigo]);
       return;
     }
     fetch("api/paradas-linha?linha=" + encodeURIComponent(codigo))
@@ -305,10 +305,12 @@
         var lista = dados.paradas || [];
         console.info("Paradas da linha " + codigo + ": " + lista.length);
         if (!estado.parada || estado.codigoSelecionado !== codigo) return;
-        estado.infoParadas = { codigo: codigo, total: lista.length };
+        estado.infoParadas = { codigo: codigo, total: lista.length, fonte: dados.fonte };
         if (lista.length > 0) {
-          paradasPorLinha[codigo] = lista;      // só guarda resposta com paradas
-          desenharParadasDaLinha(codigo);
+          // A lista completa da API fica guardada; a do plano B (via previsão) depende
+          // dos ônibus em circulação no momento, então não é guardada
+          if (dados.fonte !== "previsao") paradasPorLinha[codigo] = lista;
+          desenharParadasDaLinha(codigo, lista);
         } else {
           vazias[codigo] = (vazias[codigo] || 0) + 1;
           if (vazias[codigo] < 3) paradasDesenhadasDe = null;   // tenta de novo (até 3 vezes)
@@ -320,9 +322,9 @@
       });
   }
 
-  function desenharParadasDaLinha(codigo) {
+  function desenharParadasDaLinha(codigo, lista) {
     camadaParadasLinha.clearLayers();
-    (paradasPorLinha[codigo] || []).forEach(function (p) {
+    (lista || []).forEach(function (p) {
       if (!estado.parada || p.id === estado.parada.id) return;   // a escolhida já está destacada
       if (!Number.isFinite(p.lat) || !Number.isFinite(p.lon)) return;
       L.circleMarker([p.lat, p.lon], {
