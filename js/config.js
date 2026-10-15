@@ -4,7 +4,7 @@ window.APP_CONFIG = {
   nome: "Ônibus ao Vivo SP",
   sigla: "OVSP",
   painel: {
-    atualizacaoMs: 15000,      // intervalo entre atualizações das previsões
+    atualizacaoMs: 12000,      // intervalo entre atualizações das previsões
     atualizacaoMaxMs: 60000    // espera máxima quando a API está falhando
   },
   paradas: {
