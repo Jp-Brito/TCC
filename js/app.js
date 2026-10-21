@@ -4,6 +4,14 @@
   var cfg = window.APP_CONFIG;
   var raiz = document.documentElement;
 
+  // Se algo quebrar, mostra o erro na tela (no celular não há console para olhar)
+  window.addEventListener("error", function (e) {
+    var caixa = document.getElementById("aviso");
+    if (!caixa || (e.filename && e.filename.indexOf(location.origin) !== 0)) return;
+    caixa.textContent = "Erro no app: " + e.message;
+    caixa.hidden = false;
+  });
+
   document.getElementById("brandName").textContent = cfg.nome;
 
   /* ---------- Tema ---------- */
@@ -64,12 +72,21 @@
   /* ---------- Aviso rápido ---------- */
   var aviso = document.getElementById("aviso");
   var timerAviso = null;
-  function mostrarAviso(texto) {
+  function mostrarAviso(texto, duracaoMs) {
     aviso.textContent = texto;
     aviso.hidden = false;
     clearTimeout(timerAviso);
-    timerAviso = setTimeout(function () { aviso.hidden = true; }, 5000);
+    timerAviso = setTimeout(function () { aviso.hidden = true; }, duracaoMs || 5000);
   }
+
+  function ehIOS() {
+    return /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);   // iPad novo
+  }
+
+  // Pede a localização logo no início, antes das outras etapas: assim, mesmo que
+  // algo adiante falhe, o aparelho já recebeu o pedido de permissão.
+  irParaMim(false);
 
   /* ---------- Paradas de ônibus ---------- */
   var indiceParadas = null;
@@ -164,13 +181,32 @@
     return ll;
   }
 
+  function mensagemFalhaLocalizacao(err) {
+    if (!window.isSecureContext) return "A localização só funciona em conexão segura (HTTPS).";
+    if (err.code === 1) {
+      return ehIOS()
+        ? "Localização bloqueada. No iPhone: Ajustes > Privacidade e Segurança > Serviços de Localização > Sites do Safari > Ao Usar o App. Depois toque no botão de localização. (erro 1)"
+        : "Localização bloqueada para este site. Toque no cadeado ao lado do endereço > Permissões > Localização > Permitir. Depois toque no botão de localização. (erro 1)";
+    }
+    if (err.code === 2) return "Não foi possível obter sua posição. Confira se a localização (GPS) do aparelho está ligada. (erro 2)";
+    return "A localização demorou demais. Toque no botão de localização para tentar de novo. (erro 3)";
+  }
+
   function falhaLocalizacao(err) {
-    var msgs = {
-      1: "Permissão de localização negada. Ative a localização no navegador.",
-      2: "Não foi possível obter sua localização.",
-      3: "A localização demorou demais. Tente de novo."
-    };
-    mostrarAviso(msgs[err.code] || msgs[2]);
+    mostrarAviso(mensagemFalhaLocalizacao(err), 10000);
+  }
+
+  // Tenta com GPS (mais preciso). Se demorar ou falhar por outro motivo que não seja
+  // permissão, tenta de novo com precisão menor, que costuma funcionar em ambientes fechados.
+  function pedirPosicao(sucesso, falha) {
+    navigator.geolocation.getCurrentPosition(sucesso, function (err) {
+      if (err.code === 1) { falha(err); return; }
+      navigator.geolocation.getCurrentPosition(sucesso, falha, {
+        enableHighAccuracy: false,
+        timeout: 15000,
+        maximumAge: 60000
+      });
+    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 });
   }
 
   // Pede a localização e centraliza o mapa nela (ponto do usuário no centro da tela)
@@ -183,18 +219,14 @@
     if (ultimaPosicao) {
       mapa.flyTo(ultimaPosicao, cfg.mapa.zoomUsuario, { duration: 0.6 });
     }
-    navigator.geolocation.getCurrentPosition(function (pos) {
+    pedirPosicao(function (pos) {
       var ll = desenharUsuario(pos);
       if (comAnimacao || ultimaPosicao) {
         mapa.flyTo(ll, cfg.mapa.zoomUsuario, { duration: 0.6 });
       } else {
         mapa.setView(ll, cfg.mapa.zoomUsuario);
       }
-    }, falhaLocalizacao, {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 5000
-    });
+    }, falhaLocalizacao);
   }
 
   // Botão no mapa (direita, acima do zoom)
@@ -223,8 +255,39 @@
   });
   new ControleLocalizar().addTo(mapa);
 
-  // Ao abrir o site, já centraliza na pessoa
-  irParaMim(false);
+  /* ---------- Instalar como aplicativo (PWA) ---------- */
+  var btnInstalar = document.getElementById("btnInstalar");
+  var eventoInstalacao = null;
+
+  function jaInstalado() {
+    return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) ||
+      window.navigator.standalone === true;
+  }
+
+  // Android/Chrome: o navegador avisa quando o app pode ser instalado
+  window.addEventListener("beforeinstallprompt", function (e) {
+    e.preventDefault();
+    eventoInstalacao = e;
+    if (!jaInstalado()) btnInstalar.hidden = false;
+  });
+  window.addEventListener("appinstalled", function () {
+    eventoInstalacao = null;
+    btnInstalar.hidden = true;
+  });
+  // iPhone/iPad: não existe aviso automático; o botão mostra o passo a passo
+  if (ehIOS() && !jaInstalado()) btnInstalar.hidden = false;
+
+  btnInstalar.addEventListener("click", function () {
+    if (eventoInstalacao) {
+      eventoInstalacao.prompt();
+      eventoInstalacao.userChoice.then(function () {
+        eventoInstalacao = null;
+        btnInstalar.hidden = true;
+      });
+    } else {
+      mostrarAviso("Para instalar: toque em Compartilhar (o quadrado com a seta) e depois em \u201cAdicionar à Tela de Início\u201d. Se não aparecer, abra o endereço direto no Safari.", 12000);
+    }
+  });
 
   /* ---------- PWA: service worker (exige HTTPS ou localhost) ---------- */
   if ("serviceWorker" in navigator) {

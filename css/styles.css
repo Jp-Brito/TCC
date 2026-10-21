@@ -96,6 +96,7 @@ body { position: relative; overflow: hidden; }
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
+.icon-btn[hidden] { display: none; }
 .icon-btn:hover  { border-color: var(--cor-marca); }
 .icon-btn:active { transform: scale(0.96); }
 .icon-btn:focus-visible { outline: 2px solid var(--cor-marca); outline-offset: 2px; }
