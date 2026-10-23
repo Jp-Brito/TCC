@@ -228,15 +228,63 @@
     marcadores = {};
   }
 
-  // Ícone: círculo na cor da linha com uma seta. Sem direção conhecida, mostra só um ponto.
+  // Ônibus visto de cima (a frente fica para cima), com teto, para-brisa, faróis e
+  // lanternas. O corpo usa a cor da linha (variável CSS --cor); o degradê, o brilho e a
+  // sombra dão a ideia de volume. A rotação (variável --rumo) aponta para onde ele anda.
+  var ONIBUS_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 64" aria-hidden="true">' +
+    '<defs><linearGradient id="onibusLuz" x1="0" y1="0" x2="1" y2="0">' +
+      '<stop offset="0" stop-color="#fff" stop-opacity="0.26"/><stop offset="0.5" stop-color="#fff" stop-opacity="0"/>' +
+      '<stop offset="1" stop-color="#000" stop-opacity="0.38"/></linearGradient></defs>' +
+    '<rect class="onibus__corpo" x="2" y="1" width="24" height="62" rx="7" stroke="#fff" stroke-width="1.6"/>' +
+    '<rect x="2" y="1" width="24" height="62" rx="7" fill="url(#onibusLuz)"/>' +
+    '<rect x="5" y="13" width="18" height="42" rx="3.5" fill="#fff" opacity="0.09"/>' +
+    '<rect x="8" y="22" width="12" height="7" rx="2" fill="#fff" opacity="0.2"/>' +
+    '<rect x="8" y="35" width="12" height="7" rx="2" fill="#fff" opacity="0.2"/>' +
+    '<path d="M5.5 12 L7 4.8 Q14 2.4 21 4.8 L22.5 12 Q14 10.2 5.5 12Z" fill="#111827"/>' +
+    '<path d="M8.2 6.4 Q14 5 19.8 6.4" stroke="#fff" stroke-opacity="0.45" stroke-width="0.9" fill="none"/>' +
+    '<rect x="7" y="57" width="14" height="3.4" rx="1.4" fill="#111827"/>' +
+    '<circle cx="6.6" cy="2.9" r="1.1" fill="#FEF3C7"/><circle cx="21.4" cy="2.9" r="1.1" fill="#FEF3C7"/>' +
+    '<rect x="4.4" y="61" width="3.2" height="1.4" rx="0.7" fill="#EF4444"/><rect x="20.4" y="61" width="3.2" height="1.4" rx="0.7" fill="#EF4444"/>' +
+    '<rect x="0.4" y="9" width="2" height="3.6" rx="1" fill="#111827"/><rect x="25.6" y="9" width="2" height="3.6" rx="1" fill="#111827"/>' +
+    '</svg>';
+
   // (As cores já foram conferidas como hexadecimal em corDaLinha, então são seguras no HTML.)
-  function criarIcone(rumo, cor) {
-    var fundo = 'style="background:#' + cor.fundo + '"';
-    var html = rumo !== null
-      ? '<div class="seta" ' + fundo + '><svg viewBox="0 0 24 24" width="22" height="22" style="transform: rotate(' +
-        Math.round(rumo) + 'deg)"><path d="M12 3 L19 20 L12 16 L5 20 Z" fill="#' + cor.texto + '"></path></svg></div>'
-      : '<div class="seta seta--sem-rumo" ' + fundo + '><span style="background:#' + cor.texto + '"></span></div>';
-    return L.divIcon({ className: "seta-icone", html: html, iconSize: [34, 34], iconAnchor: [17, 17] });
+  function criarIconeOnibus(cor) {
+    var html = '<div class="onibus3d" style="--cor:#' + cor.fundo + '">' + ONIBUS_SVG + '</div>';
+    return L.divIcon({ className: "onibus-icone", html: html, iconSize: [44, 44], iconAnchor: [22, 22] });
+  }
+
+  // Aponta o ônibus para o rumo (em graus). Soma a menor volta possível, para a rotação
+  // nunca girar "pelo lado errado" ao passar de 359 para 1 grau.
+  function definirRumo(registro, rumo) {
+    if (rumo === null) return;
+    var alvo = registro.angulo === null ? rumo : registro.angulo + (((rumo - registro.angulo + 540) % 360) - 180);
+    if (registro.angulo !== null && Math.abs(alvo - registro.angulo) < 1) return;
+    registro.angulo = alvo;
+    var elemento = registro.marcador.getElement();
+    var onibus = elemento && elemento.querySelector(".onibus3d");
+    if (onibus) onibus.style.setProperty("--rumo", alvo + "deg");
+  }
+
+  // Direção do trecho do traçado mais próximo do ônibus (as linhas do GTFS seguem o
+  // sentido da viagem). Se o ônibus estiver a mais de 60 m do traçado, devolve null.
+  function rumoNoTracado(pontos, lat, lon) {
+    var k = 111320, cos = Math.cos(lat * Math.PI / 180);
+    var px = lon * k * cos, py = lat * k;
+    var menor = Infinity, rumo = null;
+    for (var i = 0; i < pontos.length - 1; i++) {
+      var ax = pontos[i][1] * k * cos, ay = pontos[i][0] * k;
+      var bx = pontos[i + 1][1] * k * cos, by = pontos[i + 1][0] * k;
+      var dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+      var u = l2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2)) : 0;
+      var d = Math.sqrt(Math.pow(px - (ax + u * dx), 2) + Math.pow(py - (ay + u * dy), 2));
+      if (d < menor) {
+        menor = d;
+        rumo = rumoEntre({ lat: pontos[i][0], lon: pontos[i][1] }, { lat: pontos[i + 1][0], lon: pontos[i + 1][1] });
+      }
+    }
+    return menor <= 60 ? rumo : null;
   }
 
   // Estima a direção do ônibus pelo deslocamento desde a última posição conhecida
@@ -400,6 +448,7 @@
           desenharTracado(linha, pontos);
         }
         renderizar();
+        desenharOnibus();   // agora que há traçado, os ônibus ganham a direção correta
       })
       .catch(function () {
         tracadoDesenhadoDe = null;                    // tenta de novo na próxima atualização
@@ -420,23 +469,23 @@
       presentes[v.prefixo] = true;
       pontos.push([v.lat, v.lon]);
 
-      var rumo = atualizarRumo(v);
+      // Direção: primeiro pelo traçado da linha; se não houver, pelo deslocamento
+      var rumoMovimento = atualizarRumo(v);
+      var rumoTracado = tracadosCache[linha.codigo] ? rumoNoTracado(tracadosCache[linha.codigo], v.lat, v.lon) : null;
+      var rumo = rumoTracado !== null ? rumoTracado : rumoMovimento;
       var conteudo = conteudoPopup(linha, v);
       var existente = marcadores[v.prefixo];
 
       if (existente) {
         existente.marcador.setLatLng([v.lat, v.lon]);
-        if (existente.rumo !== (rumo === null ? null : Math.round(rumo))) {
-          existente.marcador.setIcon(criarIcone(rumo, corDaLinha(linha.cor)));
-          existente.rumo = rumo === null ? null : Math.round(rumo);
-        }
+        definirRumo(existente, rumo);
         existente.popup.setContent(conteudo.raiz);   // atualiza sem fechar o pop-up
         existente.idadeEl = conteudo.idadeEl;
         return;
       }
 
       var marcador = L.marker([v.lat, v.lon], {
-        icon: criarIcone(rumo, corDaLinha(linha.cor)),
+        icon: criarIconeOnibus(corDaLinha(linha.cor)),
         keyboard: false,
         zIndexOffset: 500
       }).addTo(camadaOnibus);
@@ -449,15 +498,13 @@
         className: "popup-tema",
         autoPanPaddingTopLeft: [20, 90],
         autoPanPaddingBottomRight: [20, medirAltura() + 20],
-        offset: [0, -8],
+        offset: [0, -30],
         closeButton: true
       }).setContent(conteudo.raiz);
       marcador.bindPopup(popup);
 
-      marcadores[v.prefixo] = {
-        marcador: marcador, popup: popup, idadeEl: conteudo.idadeEl,
-        rumo: rumo === null ? null : Math.round(rumo)
-      };
+      marcadores[v.prefixo] = { marcador: marcador, popup: popup, idadeEl: conteudo.idadeEl, angulo: null };
+      definirRumo(marcadores[v.prefixo], rumo);
     });
 
     // Remove ônibus que saíram da lista
@@ -630,6 +677,14 @@
     camadaParadasLinha = L.layerGroup().addTo(mapa);
     camadaOnibus = L.layerGroup().addTo(mapa);
 
+    // O ônibus cresce quando o mapa se aproxima e diminui quando se afasta
+    function atualizarEscala() {
+      var escala = Math.max(0.45, Math.min(1.35, 0.95 * Math.pow(1.25, mapa.getZoom() - 17)));
+      mapa.getContainer().style.setProperty("--escala-onibus", escala.toFixed(3));
+    }
+    mapa.on("zoom zoomend", atualizarEscala);
+    atualizarEscala();
+
     document.getElementById("painelFechar").addEventListener("click", fechar);
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") fechar(); });
     window.addEventListener("resize", medirAltura);
@@ -648,7 +703,7 @@
     estaAberto: estaAberto,
     _teste: {
       paraMinutos: paraMinutos, minutosAte: minutosAte, textoTempo: textoTempo,
-      processar: processar, decodificarPolilinha: decodificarPolilinha, distanciaM: distanciaM, rumoEntre: rumoEntre, textoIdade: textoIdade
+      processar: processar, decodificarPolilinha: decodificarPolilinha, rumoNoTracado: rumoNoTracado, distanciaM: distanciaM, rumoEntre: rumoEntre, textoIdade: textoIdade
     }
   };
 })();

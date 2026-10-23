@@ -259,19 +259,17 @@ body.painel-aberto .leaflet-bottom { bottom: var(--altura-painel); }
 .linha__tempo strong { font-size: 1.05rem; color: var(--cor-marca); }
 .linha__tempo small { font-size: 0.72rem; color: var(--texto-suave); }
 
-/* Ônibus no mapa: setinha */
-.seta-icone { background: transparent; border: 0; }
-.seta {
-  width: 34px; height: 34px;
-  display: grid; place-items: center;
-  background: #8B5CF6;
-  border: 3px solid #fff;
-  border-radius: 50%;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+/* Ônibus no mapa: visto de cima, na cor da linha */
+.onibus-icone { background: transparent; border: 0; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.55)); }
+.onibus3d {
+  position: absolute; left: 50%; top: 50%;
+  width: 28px; height: 64px; margin: -32px 0 0 -14px;
+  transform: rotate(var(--rumo, 0deg)) scale(var(--escala-onibus, 0.95));
+  transition: transform 0.5s ease;
   cursor: pointer;
 }
-.seta svg { display: block; transition: transform 0.4s ease; }
-.seta--sem-rumo span { width: 10px; height: 10px; border-radius: 50%; background: #fff; }
+.onibus3d svg { display: block; width: 100%; height: 100%; }
+.onibus__corpo { fill: var(--cor, #8B5CF6); }
 
 /* Pop-up do ônibus (segue o tema) */
 .popup-tema .leaflet-popup-content-wrapper,
