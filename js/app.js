@@ -155,6 +155,16 @@
   });
 
   /* ---------- Localização do usuário ---------- */
+
+  // Marcador da posição do usuário: um pino simples (gota com um círculo branco e a
+  // sombra no chão), na cor roxa do tema. A ponta do pino fica exatamente na posição.
+  var PINO_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 60" width="48" height="60" aria-hidden="true">' +
+    '<ellipse cx="24" cy="52" rx="19" ry="6" fill="#5B21B6"/>' +
+    '<path d="M24 3C14.6 3 7 10.4 7 19.6 7 31 20 44 24 51 28 44 41 31 41 19.6 41 10.4 33.4 3 24 3Z" fill="#8B5CF6"/>' +
+    '<circle cx="24" cy="19.6" r="8" fill="#fff"/>' +
+    '</svg>';
+
   var marcadorUsuario = null;
   var circuloPrecisao = null;
   var ultimaPosicao = null;   // [lat, lng] da última localização obtida
@@ -173,9 +183,15 @@
     }).addTo(mapa);
 
     marcadorUsuario = L.marker(ll, {
-      icon: L.divIcon({ className: "user-dot", html: "<span></span>", iconSize: [18, 18] }),
+      icon: L.divIcon({
+        className: "user-pin",
+        html: PINO_SVG,
+        iconSize: [48, 60],
+        iconAnchor: [24, 52]          // a ponta do pino fica na posição do usuário
+      }),
       interactive: false,
-      keyboard: false
+      keyboard: false,
+      zIndexOffset: 1000
     }).addTo(mapa);
 
     return ll;
