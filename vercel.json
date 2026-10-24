@@ -31,5 +31,5 @@
       "includeFiles": "data/tracados.json"
     }
   },
-  "regions": ["sao1"]
+  "regions": ["gru1"]
 }
