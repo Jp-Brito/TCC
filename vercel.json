@@ -30,5 +30,6 @@
     "api/tracado.js": {
       "includeFiles": "data/tracados.json"
     }
-  }
+  },
+  "regions": ["sao1"]
 }
