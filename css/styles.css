@@ -298,4 +298,4 @@ body.painel-aberto .leaflet-bottom { bottom: var(--altura-painel); }
 .popup-onibus { min-width: 180px; max-width: 240px; }
 .popup-onibus__titulo { display: block; font-size: 1.05rem; color: var(--cor-marca); margin-bottom: 4px; }
 .popup-onibus__linha { font-size: 0.88rem; margin-top: 2px; overflow-wrap: anywhere; }
-.popup-onibus__coord { font-size: 0.72rem; color: var(--texto-suave); margin-top: 3px; }
+.popup-onibus__coord { font-size: 0.72rem; color: var(--texto-suave); margin-top: 3px; } 
