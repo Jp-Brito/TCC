@@ -77,12 +77,20 @@
       <div class="painel__textos">
         <h2 id="painelTitulo" class="painel__titulo"></h2>
         <p id="painelSub" class="painel__sub"></p>
+        <p id="painelResumo" class="painel__resumo"></p>
       </div>
-      <button id="painelFechar" class="icon-btn icon-btn--pequeno" type="button" aria-label="Fechar painel">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      </button>
+      <div class="painel__botoes">
+        <button id="painelMinimizar" class="icon-btn icon-btn--pequeno" type="button" aria-label="Minimizar painel" aria-expanded="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </button>
+        <button id="painelFechar" class="icon-btn icon-btn--pequeno" type="button" aria-label="Fechar painel">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
     </header>
     <div id="painelCorpo" class="painel__corpo"></div>
     <footer id="painelRodape" class="painel__rodape"></footer>

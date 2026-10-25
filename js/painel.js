@@ -30,6 +30,7 @@
     codigoSelecionado: null,
     horaReferencia: null,
     erro: null,
+    minimizado: false,     // painel recolhido (só o cabeçalho), para ver mais do mapa
     carregando: false,
     ajustarMapa: false,    // true = na próxima atualização, enquadrar parada + ônibus
     controlador: null,
@@ -180,6 +181,12 @@
       rodape += " · traçado: " + (estado.infoTracado.total > 0 ? estado.infoTracado.total + " pontos" : "indisponível");
     }
     els.rodape.textContent = rodape;
+
+    // Resumo mostrado quando o painel está minimizado: linha selecionada e a próxima chegada
+    var selecionada = estado.linhas.filter(function (l) { return l.codigo === estado.codigoSelecionado; })[0];
+    els.resumo.textContent = selecionada
+      ? selecionada.letreiro + " · " + textoTempo(selecionada.veiculos[0].minutos) + (selecionada.destino ? " · " + selecionada.destino : "")
+      : (estado.carregando ? "Buscando previsões..." : "Nenhum ônibus previsto agora");
 
     medirAltura();
   }
@@ -617,6 +624,15 @@
 
   /* ---------- Abrir e fechar ---------- */
 
+  // Recolhe o painel (só o cabeçalho com o resumo) ou o abre de novo
+  function minimizar(valor) {
+    estado.minimizado = (valor === undefined) ? !estado.minimizado : valor;
+    els.painel.classList.toggle("minimizado", estado.minimizado);
+    els.minimizar.setAttribute("aria-expanded", String(!estado.minimizado));
+    els.minimizar.setAttribute("aria-label", estado.minimizado ? "Expandir painel" : "Minimizar painel");
+    medirAltura();
+  }
+
   function abrir(parada, linhaPreferida) {
     if (estado.controlador) estado.controlador.abort();
     clearTimeout(estado.timer);
@@ -645,6 +661,7 @@
     }).addTo(camadaSelecao);
 
     els.painel.classList.add("aberto");
+    minimizar(false);          // ao abrir uma parada, o painel começa aberto
     avisarMudanca();
     renderizar();
     mostrarParadaAcima();
@@ -663,7 +680,7 @@
     camadaTracado.clearLayers();
     tracadoDesenhadoDe = null;
     els.painel.classList.remove("aberto");
-    medirAltura();
+    minimizar(false);
     avisarMudanca();
   }
 
@@ -685,7 +702,9 @@
       titulo: document.getElementById("painelTitulo"),
       sub: document.getElementById("painelSub"),
       corpo: document.getElementById("painelCorpo"),
-      rodape: document.getElementById("painelRodape")
+      rodape: document.getElementById("painelRodape"),
+      resumo: document.getElementById("painelResumo"),
+      minimizar: document.getElementById("painelMinimizar")
     };
     camadaSelecao = L.layerGroup().addTo(mapa);
     camadaTracado = L.layerGroup().addTo(mapa);         // embaixo das paradas e dos ônibus
@@ -701,6 +720,12 @@
     atualizarEscala();
 
     document.getElementById("painelFechar").addEventListener("click", fechar);
+    els.minimizar.addEventListener("click", function () { minimizar(); });
+    // Tocar na alça alterna; tocar no título só serve para reabrir quando está minimizado
+    els.painel.querySelector(".painel__alca").addEventListener("click", function () { minimizar(); });
+    els.painel.querySelector(".painel__textos").addEventListener("click", function () {
+      if (estado.minimizado) minimizar(false);
+    });
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") fechar(); });
     window.addEventListener("resize", medirAltura);
     setInterval(atualizarIdades, 1000);
