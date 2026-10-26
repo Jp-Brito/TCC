@@ -298,4 +298,54 @@ body.painel-aberto .leaflet-bottom { bottom: var(--altura-painel); }
 .popup-onibus { min-width: 180px; max-width: 240px; }
 .popup-onibus__titulo { display: block; font-size: 1.05rem; color: var(--cor-marca); margin-bottom: 4px; }
 .popup-onibus__linha { font-size: 0.88rem; margin-top: 2px; overflow-wrap: anywhere; }
-.popup-onibus__coord { font-size: 0.72rem; color: var(--texto-suave); margin-top: 3px; } 
+.popup-onibus__coord { font-size: 0.72rem; color: var(--texto-suave); margin-top: 3px; }
+
+/* ---------- Busca de linhas ---------- */
+.busca {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  top: calc(env(safe-area-inset-top, 0px) + 12px + 44px + 10px);
+  width: min(92vw, 440px);
+  padding: 8px 10px 10px;
+  background: var(--bg-caixa);
+  border: 1px solid var(--borda-caixa);
+  border-radius: 14px;
+  box-shadow: 0 6px 24px var(--sombra);
+  color: var(--texto-icone);
+  z-index: 1250;
+}
+.busca[hidden] { display: none; }
+.busca__campo { display: flex; align-items: center; gap: 8px; }
+.busca__campo input {
+  flex: 1; min-width: 0;
+  font: inherit; font-size: 1rem; color: var(--texto-icone);
+  background: transparent; border: 0; outline: 0; padding: 8px 4px;
+}
+.busca__campo input::placeholder { color: var(--texto-suave); }
+.busca__lista { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.busca__item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 10px; text-align: left;
+  font: inherit; color: inherit; background: transparent;
+  border: 1px solid var(--borda-caixa); border-radius: 10px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.busca__item:hover, .busca__item:focus-visible { border-color: var(--cor-marca); outline: 0; }
+.busca__pilula { flex: 0 0 auto; min-width: 74px; padding: 5px 8px; text-align: center; font-weight: 800; font-size: 0.88rem; border-radius: 8px; }
+.busca__texto { display: flex; flex-direction: column; min-width: 0; }
+.busca__nome { font-weight: 600; font-size: 0.9rem; overflow-wrap: anywhere; }
+.busca__detalhe { font-size: 0.75rem; color: var(--texto-suave); }
+.busca__msg { margin: 8px 4px 0; font-size: 0.85rem; color: var(--texto-suave); }
+.busca__msg:empty { display: none; }
+
+/* Painel no modo linha: lista de ônibus */
+.onibus-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  margin: 6px 0; padding: 10px; text-align: left;
+  font: inherit; color: inherit; background: transparent;
+  border: 1px solid var(--borda-caixa); border-radius: 12px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.onibus-item:hover, .onibus-item:focus-visible { border-color: var(--cor-marca); outline: 0; }
+.onibus-item__prefixo { font-weight: 700; }
+.onibus-item__idade { flex: 1; font-size: 0.8rem; color: var(--texto-suave); }
+.onibus-item__tag { font-size: 0.72rem; color: var(--cor-marca); font-weight: 700; }

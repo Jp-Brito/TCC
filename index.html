@@ -47,7 +47,7 @@
         </svg>
       </button>
 
-      <button class="icon-btn" id="btnBusca" type="button" aria-label="Buscar linha ou ponto">
+      <button class="icon-btn" id="btnBusca" type="button" aria-label="Buscar linha" aria-expanded="false" aria-controls="busca">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         </svg>
@@ -64,6 +64,24 @@
       </button>
     </div>
   </header>
+
+  <!-- Busca de linhas (abre ao tocar na lupa) -->
+  <div id="busca" class="busca" role="search" hidden>
+    <div class="busca__campo">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input id="buscaEntrada" type="search" inputmode="search" autocomplete="off" spellcheck="false"
+             placeholder="Linha ou nome (ex.: 8000, 7M, Lapa)" aria-label="Buscar linha">
+      <button id="buscaFechar" class="icon-btn icon-btn--pequeno" type="button" aria-label="Fechar busca">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    <ul id="buscaLista" class="busca__lista"></ul>
+    <p id="buscaMsg" class="busca__msg" role="status"></p>
+  </div>
 
   <main class="map-wrap">
     <div id="map" role="application" aria-label="Mapa da cidade de São Paulo"></div>
@@ -100,6 +118,7 @@
   <script src="js/config.js"></script>
   <script src="js/paradas.js"></script>
   <script src="js/painel.js"></script>
+  <script src="js/busca.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

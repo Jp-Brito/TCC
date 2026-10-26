@@ -136,6 +136,7 @@
   }
 
   Painel.iniciar(mapa, cfg, function () { return indiceParadas; });
+  Busca.iniciar(function (linha) { Painel.abrirLinha(linha); });   // lupa: abre a linha escolhida
 
   // Painel abriu: esconde as outras paradas. Painel fechou: elas voltam.
   document.addEventListener("painel:mudou", function () {

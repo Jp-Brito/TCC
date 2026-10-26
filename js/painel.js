@@ -30,6 +30,7 @@
     codigoSelecionado: null,
     horaReferencia: null,
     erro: null,
+    modoLinha: null,       // linha aberta pela busca (sem parada): { codigo, letreiro, cor, ... }
     minimizado: false,     // painel recolhido (só o cabeçalho), para ver mais do mapa
     carregando: false,
     ajustarMapa: false,    // true = na próxima atualização, enquadrar parada + ônibus
@@ -140,6 +141,11 @@
     return e;
   }
 
+  // Há algo aberto no painel: uma parada ou uma linha vinda da busca
+  function ativo() {
+    return estado.parada !== null || estado.modoLinha !== null;
+  }
+
   /* ---------- Desenho do painel ---------- */
 
   function medirAltura() {
@@ -150,7 +156,64 @@
     return h;
   }
 
+  // Informações de diagnóstico das paradas e do traçado da linha selecionada
+  function complementoRodape() {
+    var texto = "";
+    if (estado.infoParadas) {
+      texto += " · linha " + estado.infoParadas.codigo + ": " +
+        (estado.infoParadas.total > 0
+          ? estado.infoParadas.total + " paradas" + (estado.infoParadas.fonte === "previsao" ? " (via previsão)" : "")
+          : "a API não devolveu paradas");
+    }
+    if (estado.infoTracado) {
+      texto += " · traçado: " + (estado.infoTracado.total > 0 ? estado.infoTracado.total + " pontos" : "indisponível");
+    }
+    return texto;
+  }
+
+  // Painel no modo linha (aberto pela busca): lista os ônibus da linha
+  function renderizarLinha() {
+    var item = estado.modoLinha;
+    var linha = estado.linhas[0];
+    els.titulo.textContent = item.letreiro;
+    els.sub.textContent = linha.destino ? "Sentido: " + linha.destino : item.rotulo;
+    els.corpo.textContent = "";
+
+    if (estado.carregando && linha.veiculos.length === 0) {
+      els.corpo.appendChild(el("p", "painel__aviso", "Buscando os ônibus da linha..."));
+    } else if (estado.erro && linha.veiculos.length === 0) {
+      els.corpo.appendChild(el("p", "painel__aviso", estado.erro));
+    } else if (linha.veiculos.length === 0) {
+      els.corpo.appendChild(el("p", "painel__aviso", "Nenhum ônibus em circulação nesta linha agora."));
+    } else {
+      linha.veiculos.forEach(function (v) {
+        var botao = el("button", "onibus-item");
+        botao.type = "button";
+        botao.appendChild(el("span", "onibus-item__prefixo", "Ônibus " + v.prefixo));
+        botao.appendChild(el("span", "onibus-item__idade", "posição " + textoIdade(idadeSegundos(v.atualizadoEm))));
+        if (v.acessivel) botao.appendChild(el("span", "onibus-item__tag", "acessível"));
+        botao.addEventListener("click", function () {
+          var m = marcadores[v.prefixo];
+          if (!m) return;
+          mapa.flyTo(m.marcador.getLatLng(), Math.max(mapa.getZoom(), 16), { duration: 0.6 });
+          m.marcador.openPopup();
+        });
+        els.corpo.appendChild(botao);
+      });
+    }
+
+    var rodape = estado.horaReferencia ? "Atualizado às " + estado.horaReferencia : "";
+    if (estado.erro && linha.veiculos.length > 0) rodape += " · " + estado.erro;
+    els.rodape.textContent = rodape + complementoRodape();
+
+    var n = linha.veiculos.length;
+    els.resumo.textContent = estado.carregando && n === 0 ? "Buscando os ônibus..."
+      : n + (n === 1 ? " ônibus em circulação" : " ônibus em circulação");
+    medirAltura();
+  }
+
   function renderizar() {
+    if (estado.modoLinha) { renderizarLinha(); return; }
     els.titulo.textContent = estado.parada.nome;
     els.sub.textContent = "Parada " + estado.parada.id +
       (estado.parada.referencia ? " · " + estado.parada.referencia : "");
@@ -171,15 +234,7 @@
 
     var rodape = estado.horaReferencia ? "Atualizado às " + estado.horaReferencia : "";
     if (estado.erro && estado.linhas.length > 0) rodape += " · " + estado.erro;
-    if (estado.infoParadas) {
-      rodape += " · linha " + estado.infoParadas.codigo + ": " +
-        (estado.infoParadas.total > 0
-          ? estado.infoParadas.total + " paradas" + (estado.infoParadas.fonte === "previsao" ? " (via previsão)" : "")
-          : "a API não devolveu paradas");
-    }
-    if (estado.infoTracado) {
-      rodape += " · traçado: " + (estado.infoTracado.total > 0 ? estado.infoTracado.total + " pontos" : "indisponível");
-    }
+    rodape += complementoRodape();
     els.rodape.textContent = rodape;
 
     // Resumo mostrado quando o painel está minimizado: linha selecionada e a próxima chegada
@@ -364,7 +419,7 @@
       .then(function (dados) {
         var lista = dados.paradas || [];
         console.info("Paradas da linha " + codigo + ": " + lista.length);
-        if (!estado.parada || estado.codigoSelecionado !== codigo) return;
+        if (!ativo() || estado.codigoSelecionado !== codigo) return;
         estado.infoParadas = { codigo: codigo, total: lista.length, fonte: dados.fonte };
         if (lista.length > 0) {
           // A lista completa da API fica guardada; a do plano B (via previsão) depende
@@ -385,7 +440,7 @@
   function desenharParadasDaLinha(codigo, lista) {
     camadaParadasLinha.clearLayers();
     (lista || []).forEach(function (p) {
-      if (!estado.parada || p.id === estado.parada.id) return;   // a escolhida já está destacada
+      if (!ativo() || (estado.parada && p.id === estado.parada.id)) return;   // a escolhida já está destacada
       if (!Number.isFinite(p.lat) || !Number.isFinite(p.lon)) return;
       L.circleMarker([p.lat, p.lon], {
         radius: 7, color: "#ffffff", weight: 2, fillColor: "#8B5CF6", fillOpacity: 1
@@ -450,8 +505,13 @@
       return;
     }
     var url = "api/tracado?linha=" + encodeURIComponent(linha.letreiro) +
-      "&destino=" + encodeURIComponent(linha.destino || "") +
+      "&destino=" + encodeURIComponent(linha.destino || (estado.modoLinha && estado.modoLinha.destino) || "") +
       "&sentido=" + encodeURIComponent(linha.sentido || "");
+    // Posições dos ônibus da linha ajudam o servidor a escolher o traçado do sentido certo
+    var posicoes = (linha.veiculos || []).slice(0, 6)
+      .filter(function (v) { return Number.isFinite(v.lat) && Number.isFinite(v.lon); })
+      .map(function (v) { return v.lat.toFixed(5) + "," + v.lon.toFixed(5); });
+    if (posicoes.length) url += "&pos=" + encodeURIComponent(posicoes.join(";"));
     fetch(url)
       .then(function (r) {
         if (r.status === 404) return null;            // linha sem traçado no GTFS
@@ -459,7 +519,7 @@
         return r.json();
       })
       .then(function (dados) {
-        if (!estado.parada || estado.codigoSelecionado !== codigo) return;
+        if (!ativo() || estado.codigoSelecionado !== codigo) return;
         if (!dados) {
           estado.infoTracado = { total: 0 };
         } else {
@@ -468,6 +528,10 @@
           tracadosCache[codigo] = pontos;
           estado.infoTracado = { total: pontos.length };
           desenharTracado(linha, pontos);
+          if (estado.modoLinha) {
+            linha.destino = dados.destino;      // destino real da viagem, vindo do GTFS
+            estado.ajustarMapa = true;          // com o traçado conhecido, enquadra a linha inteira
+          }
         }
         renderizar();
         desenharOnibus();   // agora que há traçado, os ônibus ganham a direção correta
@@ -483,7 +547,7 @@
     atualizarTracado(linha);
     if (!linha) { limparOnibus(); return; }
 
-    var pontos = [[estado.parada.lat, estado.parada.lon]];
+    var pontos = estado.parada ? [[estado.parada.lat, estado.parada.lon]] : [];
     var presentes = {};
 
     linha.veiculos.forEach(function (v) {
@@ -537,7 +601,10 @@
       }
     });
 
-    if (estado.ajustarMapa && pontos.length > 1) {
+    // No modo linha, enquadra o traçado inteiro além dos ônibus
+    if (estado.modoLinha && tracadosCache[linha.codigo]) pontos = pontos.concat(tracadosCache[linha.codigo]);
+
+    if (estado.ajustarMapa && pontos.length > (estado.modoLinha ? 0 : 1)) {
       estado.ajustarMapa = false;
       mapa.fitBounds(pontos, {
         paddingTopLeft: [40, 90],
@@ -573,7 +640,7 @@
 
   function agendar(ms) {
     clearTimeout(estado.timer);
-    estado.timer = setTimeout(buscar, ms);
+    estado.timer = setTimeout(estado.modoLinha ? buscarLinha : buscar, ms);
   }
 
   function buscar() {
@@ -624,6 +691,82 @@
 
   /* ---------- Abrir e fechar ---------- */
 
+  // Posição dos ônibus da linha aberta pela busca (atualiza sozinha, como as previsões)
+  function buscarLinha() {
+    var item = estado.modoLinha;
+    if (!item) return;
+    if (document.hidden) { estado.timer = null; return; }
+
+    if (estado.controlador) estado.controlador.abort();
+    var controlador = new AbortController();
+    estado.controlador = controlador;
+
+    fetch("api/posicao?linha=" + encodeURIComponent(item.codigo), { signal: controlador.signal })
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        estado.dataServidor = Date.parse(r.headers.get("Date"));
+        estado.recebidoEm = performance.now();
+        return r.json();
+      })
+      .then(function (dados) {
+        if (!estado.modoLinha || estado.modoLinha.codigo !== item.codigo) return;
+        var linha = estado.linhas[0];
+        linha.veiculos = (dados.veiculos || []).map(function (v) {
+          return { prefixo: v.prefixo, acessivel: v.acessivel, atualizadoEm: v.atualizadoEm,
+                   lat: v.lat, lon: v.lon, chegada: null, minutos: null };
+        });
+        estado.horaReferencia = dados.horaReferencia;
+        estado.erro = null;
+        estado.carregando = false;
+        estado.atrasoMs = cfg.painel.atualizacaoMs;
+        renderizar();
+        desenharOnibus();
+        agendar(estado.atrasoMs);
+      })
+      .catch(function (erro) {
+        if (erro.name === "AbortError") return;
+        if (!estado.modoLinha || estado.modoLinha.codigo !== item.codigo) return;
+        estado.carregando = false;
+        estado.erro = "Não foi possível atualizar os ônibus.";
+        estado.atrasoMs = Math.min((estado.atrasoMs || cfg.painel.atualizacaoMs) * 2, cfg.painel.atualizacaoMaxMs);
+        renderizar();
+        agendar(estado.atrasoMs);
+      });
+  }
+
+  // Abre uma linha escolhida na busca: traçado, paradas da linha e ônibus em circulação
+  function abrirLinha(item) {
+    if (estado.controlador) estado.controlador.abort();
+    clearTimeout(estado.timer);
+
+    estado.parada = null;
+    estado.modoLinha = item;
+    estado.linhas = [{ codigo: item.codigo, letreiro: item.letreiro, destino: null,
+                       sentido: item.sentido, cor: item.cor, veiculos: [] }];
+    estado.codigoSelecionado = item.codigo;
+    estado.horaReferencia = null;
+    estado.erro = null;
+    estado.carregando = true;
+    estado.ajustarMapa = true;
+    estado.atrasoMs = cfg.painel.atualizacaoMs;
+    estado.infoParadas = null;
+    estado.infoTracado = null;
+
+    limparOnibus();
+    historico = {};
+    camadaSelecao.clearLayers();
+    camadaParadasLinha.clearLayers();
+    camadaTracado.clearLayers();
+    paradasDesenhadasDe = null;
+    tracadoDesenhadoDe = null;
+
+    els.painel.classList.add("aberto");
+    minimizar(false);
+    avisarMudanca();
+    renderizar();
+    buscarLinha();
+  }
+
   // Recolhe o painel (só o cabeçalho com o resumo) ou o abre de novo
   function minimizar(valor) {
     estado.minimizado = (valor === undefined) ? !estado.minimizado : valor;
@@ -637,6 +780,7 @@
     if (estado.controlador) estado.controlador.abort();
     clearTimeout(estado.timer);
 
+    estado.modoLinha = null;
     estado.parada = parada;
     estado.linhas = [];
     estado.codigoSelecionado = linhaPreferida || null;
@@ -672,6 +816,9 @@
     if (estado.controlador) estado.controlador.abort();
     clearTimeout(estado.timer);
     estado.parada = null;
+    estado.modoLinha = null;
+    estado.infoParadas = null;
+    estado.infoTracado = null;
     limparOnibus();
     historico = {};
     camadaSelecao.clearLayers();
@@ -685,7 +832,7 @@
   }
 
   function estaAberto() {
-    return estado.parada !== null;
+    return ativo();
   }
 
   // Avisa o resto do app que o painel abriu ou fechou (o mapa esconde ou mostra as paradas)
@@ -732,13 +879,17 @@
 
     // Ao voltar para a aba, atualiza na hora
     document.addEventListener("visibilitychange", function () {
-      if (!document.hidden && estado.parada) buscar();
+      if (document.hidden) return;
+      if (estado.modoLinha) buscarLinha();
+      else if (estado.parada) buscar();
     });
   }
 
   window.Painel = {
     iniciar: iniciar,
     abrir: abrir,
+    abrirLinha: abrirLinha,
+    corDaLinha: corDaLinha,
     fechar: fechar,
     estaAberto: estaAberto,
     _teste: {

@@ -2,6 +2,7 @@
 // Busca linhas pelo número ou nome. Cada linha vem uma vez por sentido,
 // e o campo "codigo" é o que as outras rotas pedem.
 import { consultarComLogin, enviarJson, tratarErro, exigirGet } from "../lib/olhovivo.js";
+import { corDaLinha } from "../lib/gtfs.js";
 
 export default async function handler(req, res) {
   if (!exigirGet(req, res)) return;
@@ -19,6 +20,7 @@ export default async function handler(req, res) {
       letreiro: `${l.lt}-${l.tl}`,       // ex.: 8000-10
       sentido: l.sl,                     // 1 = principal -> secundário, 2 = o inverso
       circular: l.lc,
+      cor: corDaLinha(`${l.lt}-${l.tl}`),   // cor oficial da linha (GTFS), ou null
       terminalPrincipal: l.tp,
       terminalSecundario: l.ts,
       destino: l.sl === 1 ? l.ts : l.tp  // derivado: conferir nos testes

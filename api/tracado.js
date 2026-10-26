@@ -1,4 +1,4 @@
-// GET /api/tracado?linha=647A-10&destino=PINHEIROS&sentido=1
+// GET /api/tracado?linha=647A-10&destino=PINHEIROS&sentido=1&pos=-23.5,-46.6;-23.6,-46.7
 // Traçado (o caminho que o ônibus faz) de uma linha, em "polilinha codificada".
 // O destino e o sentido (ambos opcionais) servem para escolher o traçado certo
 // entre os dois sentidos da linha. Esses dados vêm do GTFS e não precisam da Olho Vivo.
@@ -15,7 +15,13 @@ export default function handler(req, res) {
   const destino = String(req.query.destino ?? "").slice(0, 80);
   const sentido = Number(req.query.sentido);
 
-  const tracado = tracadoDaLinha(linha, destino, sentido);
+  // Posições de ônibus da linha (opcional): "lat,lon;lat,lon" (até 6)
+  const posicoes = String(req.query.pos ?? "").slice(0, 400).split(";").slice(0, 6)
+    .map((par) => par.split(",").map(Number))
+    .filter((v) => v.length === 2 && v.every(Number.isFinite) && Math.abs(v[0]) <= 90 && Math.abs(v[1]) <= 180)
+    .map(([lat, lon]) => ({ lat, lon }));
+
+  const tracado = tracadoDaLinha(linha, destino, sentido, posicoes);
   if (!tracado) {
     return enviarJson(res, 404, { erro: "Não há traçado para esta linha." });
   }
