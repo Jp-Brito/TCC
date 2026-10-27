@@ -136,7 +136,15 @@
   }
 
   Painel.iniciar(mapa, cfg, function () { return indiceParadas; });
-  Busca.iniciar(function (linha) { Painel.abrirLinha(linha); });   // lupa: abre a linha escolhida
+  // Lupa: busca de linhas. Se o arquivo da busca não carregar, o resto do app continua funcionando.
+  if (window.Busca) {
+    window.Busca.iniciar(function (linha) { Painel.abrirLinha(linha); });
+  } else {
+    console.warn("js/busca.js não foi carregado: a busca de linhas não vai funcionar.");
+    document.getElementById("btnBusca").addEventListener("click", function () {
+      mostrarAviso("A busca não está disponível agora. Recarregue a página.");
+    });
+  }
 
   // Painel abriu: esconde as outras paradas. Painel fechou: elas voltam.
   document.addEventListener("painel:mudou", function () {
