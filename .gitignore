@@ -4,6 +4,7 @@ node_modules/
 .env.*
 !.env.example
 .DS_Store
+desempenho.csv
 
 # GTFS grande demais para o Git (58 MB): fica só no computador.
 # O app usa o data/tracados.json, gerado a partir dele.
