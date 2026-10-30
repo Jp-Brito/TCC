@@ -89,7 +89,7 @@ mkdirSync(dirname(ARQUIVO), { recursive: true });
 if (!existsSync(ARQUIVO)) appendFileSync(ARQUIVO, "dataHora,condicao,endpoint,status,ms,bytes,regiaoVercel\n");
 
 // Descobre uma linha e uma parada reais para usar nas consultas
-const busca = await medir("linhas", "/api/linhas?termo=8000");
+const busca = await medir("linhas", "/api/linhas?termo=5119");
 const linha = busca.corpo?.linhas?.[0];
 if (!linha) { console.error("Não foi possível obter uma linha de teste. O site está no ar? (" + base + ")"); process.exit(1); }
 const paradasLinha = await medir("paradas-linha", `/api/paradas-linha?linha=${linha.codigo}`);
@@ -98,7 +98,7 @@ const parada = paradas.length ? paradas[Math.floor(paradas.length / 2)].id : nul
 
 const alvos = [
   ["status", "/api/status"],
-  ["linhas", "/api/linhas?termo=8000"],
+  ["linhas", "/api/linhas?termo=5119"],
   ["posicao", `/api/posicao?linha=${linha.codigo}`],
   ["paradas-linha", `/api/paradas-linha?linha=${linha.codigo}`],
   ...(parada ? [["previsao", `/api/previsao?parada=${parada}`]] : []),

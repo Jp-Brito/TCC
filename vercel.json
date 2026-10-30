@@ -31,5 +31,5 @@
       "includeFiles": "data/tracados.json"
     }
   },
-  "regions": ["iad1"]
+  "regions": ["gru1"]
 }
