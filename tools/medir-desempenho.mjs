@@ -48,14 +48,19 @@ if (args.includes("--resumo")) {
   if (!existsSync(ARQUIVO)) { console.error("Ainda não há medições em " + ARQUIVO); process.exit(1); }
   const [, ...linhas] = readFileSync(ARQUIVO, "utf8").trim().split("\n");
   const dados = linhas.map((l) => { const c = l.split(","); return { dataHora: c[0], condicao: c[1], endpoint: c[2], status: Number(c[3]), ms: Number(c[4]), regiao: c[6] }; });
-  console.log(`\n${dados.length} medições em ${ARQUIVO}\n`);
-  console.log("== Por endpoint =="); tabela(dados.map((d) => ({ grupo: d.endpoint, ms: d.ms, ok: d.status === 200 })));
-  console.log("\n== Por período do dia (todos os endpoints de dados em tempo real) ==");
-  tabela(dados.filter((d) => ["previsao", "posicao", "paradas-linha"].includes(d.endpoint)).map((d) => ({ grupo: periodo(d.dataHora), ms: d.ms, ok: d.status === 200 })));
-  console.log("\n== Por condição de acesso ==");
+  // Rodadas de aquecimento (condição começando com "aquecimento") ficam fora das médias
+  const validos = dados.filter((d) => !d.condicao.startsWith("aquecimento"));
+  console.log(`\n${dados.length} medições em ${ARQUIVO} (${dados.length - validos.length} de aquecimento ficam fora das tabelas abaixo, exceto a de condições)\n`);
+  console.log("== Por endpoint e condição (para comparar, por exemplo, iad1 com gru1) ==");
+  tabela(validos.map((d) => ({ grupo: `${d.condicao} | ${d.endpoint}`, ms: d.ms, ok: d.status === 200 })));
+  console.log("\n== Por endpoint (todas as condições juntas) ==");
+  tabela(validos.map((d) => ({ grupo: d.endpoint, ms: d.ms, ok: d.status === 200 })));
+  console.log("\n== Por período do dia (previsão, posição e paradas da linha) ==");
+  tabela(validos.filter((d) => ["previsao", "posicao", "paradas-linha"].includes(d.endpoint)).map((d) => ({ grupo: periodo(d.dataHora), ms: d.ms, ok: d.status === 200 })));
+  console.log("\n== Por condição de acesso (inclui o aquecimento) ==");
   tabela(dados.map((d) => ({ grupo: d.condicao, ms: d.ms, ok: d.status === 200 })));
   console.log("\n== Região de execução registrada pela Vercel ==");
-  const reg = {}; for (const d of dados) reg[d.regiao] = (reg[d.regiao] ?? 0) + 1; console.log(reg);
+  const reg = {}; for (const d of dados) { const k = `${d.condicao}: ${d.regiao}`; reg[k] = (reg[k] ?? 0) + 1; } console.log(reg);
   process.exit(0);
 }
 
