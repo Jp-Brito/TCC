@@ -43,11 +43,16 @@ function tabela(linhas) {   // linhas: [{grupo, ms, ok}]
   }
 }
 
+// Medições antigas guardaram o código da requisição no lugar da região dos arquivos estáticos
+function normalizarRegiao(texto = "") {
+  return /^[a-z0-9]+>[a-z0-9]{3,6}-\d{10,}-[a-f0-9]+$/i.test(texto) ? texto.split(">")[0] + ">estatico" : texto;
+}
+
 /* ---------- modo resumo ---------- */
 if (args.includes("--resumo")) {
   if (!existsSync(ARQUIVO)) { console.error("Ainda não há medições em " + ARQUIVO); process.exit(1); }
   const [, ...linhas] = readFileSync(ARQUIVO, "utf8").trim().split("\n");
-  const dados = linhas.map((l) => { const c = l.split(","); return { dataHora: c[0], condicao: c[1], endpoint: c[2], status: Number(c[3]), ms: Number(c[4]), regiao: c[6] }; });
+  const dados = linhas.map((l) => { const c = l.split(","); return { dataHora: c[0], condicao: c[1], endpoint: c[2], status: Number(c[3]), ms: Number(c[4]), regiao: normalizarRegiao(c[6]) }; });
   // Rodadas de aquecimento (condição começando com "aquecimento") ficam fora das médias
   const validos = dados.filter((d) => !d.condicao.startsWith("aquecimento"));
   console.log(`\n${dados.length} medições em ${ARQUIVO} (${dados.length - validos.length} de aquecimento ficam fora das tabelas abaixo, exceto a de condições)\n`);
@@ -79,7 +84,9 @@ async function medir(nome, caminho) {
     status = r.status;
     const texto = await r.text();
     bytes = Buffer.byteLength(texto);
-    regiao = (r.headers.get("x-vercel-id") ?? "").split("::").slice(0, 2).join(">");   // ex.: gru1>iad1
+    // Função: "borda::função::id" vira "gru1>iad1". Arquivo estático (sem função): "borda::id" vira "gru1>estatico".
+    const partes = (r.headers.get("x-vercel-id") ?? "").split("::");
+    regiao = partes.length >= 3 ? `${partes[0]}>${partes[1]}` : partes.length === 2 ? `${partes[0]}>estatico` : "";
     try { corpo = JSON.parse(texto); } catch { /* resposta que não é JSON */ }
   } catch { status = 0; }
   return { nome, status, ms: performance.now() - inicio, bytes, regiao, corpo };
