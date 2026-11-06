@@ -38,7 +38,7 @@
     timer: null,
     atrasoMs: 0,
     linhaPreferida: null,  // linha a manter selecionada ao trocar de parada
-    infoParadas: null,     // { codigo, total } paradas da linha selecionada, para o rodapé
+    infoParadas: null,     // { codigo, total, fonte } paradas da linha selecionada, para o rodapé
     infoTracado: null,     // { total } pontos do traçado da linha selecionada, para o rodapé
     dataServidor: NaN,     // hora do servidor (cabeçalho Date da resposta)
     recebidoEm: 0
@@ -162,7 +162,10 @@
     if (estado.infoParadas) {
       texto += " · linha " + estado.infoParadas.codigo + ": " +
         (estado.infoParadas.total > 0
-          ? estado.infoParadas.total + " paradas" + (estado.infoParadas.fonte === "previsao" ? " (via previsão)" : "")
+          ? estado.infoParadas.total + " paradas" +
+            (estado.infoParadas.fonte === "previsao" ? " (via previsão)" :
+              estado.infoParadas.fonte === "gtfs-stop-times" ? " (GTFS)" :
+              estado.infoParadas.fonte === "gtfs-proximidade" ? " (aproximação GTFS)" : "")
           : "a API não devolveu paradas");
     }
     if (estado.infoTracado) {
@@ -411,7 +414,13 @@
       desenharParadasDaLinha(codigo, paradasPorLinha[codigo]);
       return;
     }
-    fetch("api/paradas-linha?linha=" + encodeURIComponent(codigo))
+    var linhaAtual = estado.linhas.filter(function (l) { return l.codigo === codigo; })[0] || estado.modoLinha;
+    var urlParadas = "api/paradas-linha?linha=" + encodeURIComponent(codigo);
+    if (linhaAtual && linhaAtual.letreiro) {
+      urlParadas += "&letreiro=" + encodeURIComponent(linhaAtual.letreiro) +
+        "&sentido=" + encodeURIComponent(linhaAtual.sentido || "");
+    }
+    fetch(urlParadas)
       .then(function (r) {
         if (!r.ok) throw new Error("HTTP " + r.status);
         return r.json();
@@ -424,7 +433,7 @@
         if (lista.length > 0) {
           // A lista completa da API fica guardada; a do plano B (via previsão) depende
           // dos ônibus em circulação no momento, então não é guardada
-          if (dados.fonte !== "previsao") paradasPorLinha[codigo] = lista;
+          if (dados.fonte === "paradas" || dados.fonte === "gtfs-stop-times" || dados.fonte === "gtfs-proximidade") paradasPorLinha[codigo] = lista;
           desenharParadasDaLinha(codigo, lista);
         } else {
           vazias[codigo] = (vazias[codigo] || 0) + 1;

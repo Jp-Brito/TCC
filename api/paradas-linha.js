@@ -7,11 +7,14 @@
 // a consulta Previsao/Linha, que lista as paradas que a linha atende com os
 // ônibus previstos. O campo "fonte" informa de onde veio a lista.
 import { consultarComLogin, enviarJson, tratarErro, exigirGet } from "../lib/olhovivo.js";
+import { paradasDoGtfs, paradasProximasDoTracado } from "../lib/gtfs.js";
 
 export default async function handler(req, res) {
   if (!exigirGet(req, res)) return;
 
   const linha = String(req.query.linha ?? "");
+  const letreiro = String(req.query.letreiro ?? "").trim();
+  const sentido = Number(req.query.sentido);
   if (!/^\d{1,9}$/.test(linha)) {
     return enviarJson(res, 400, { erro: "Informe o parâmetro linha (apenas números)." });
   }
@@ -41,7 +44,25 @@ export default async function handler(req, res) {
       fonte = "previsao";
     }
 
-    enviarJson(res, 200, { paradas, fonte });
+    if (letreiro) {
+      const gtfs = paradasDoGtfs(letreiro, sentido);
+      if (gtfs.length) {
+        paradas = gtfs;
+        fonte = "gtfs-stop-times";
+      } else if (paradas.length < 10 || fonte === "previsao") {
+        const aproximadas = paradasProximasDoTracado(letreiro, sentido);
+        if (aproximadas.length > paradas.length) {
+          paradas = aproximadas;
+          fonte = "gtfs-proximidade";
+        }
+      }
+    }
+
+    enviarJson(res, 200, {
+      paradas,
+      fonte,
+      parcial: !["gtfs-stop-times", "gtfs-proximidade"].includes(fonte) && paradas.length < 10
+    });
   } catch (erro) {
     tratarErro(res, erro);
   }
