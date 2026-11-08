@@ -99,7 +99,8 @@ if (!existsSync(ARQUIVO)) appendFileSync(ARQUIVO, "dataHora,condicao,endpoint,st
 const busca = await medir("linhas", "/api/linhas?termo=5119");
 const linha = busca.corpo?.linhas?.[0];
 if (!linha) { console.error("Não foi possível obter uma linha de teste. O site está no ar? (" + base + ")"); process.exit(1); }
-const paradasLinha = await medir("paradas-linha", `/api/paradas-linha?linha=${linha.codigo}`);
+const paradasLinha = await medir("paradas-linha",
+  `/api/paradas-linha?linha=${linha.codigo}&letreiro=${encodeURIComponent(linha.letreiro)}&sentido=${linha.sentido}`);
 const paradas = paradasLinha.corpo?.paradas ?? [];
 const parada = paradas.length ? paradas[Math.floor(paradas.length / 2)].id : null;
 
@@ -107,7 +108,7 @@ const alvos = [
   ["status", "/api/status"],
   ["linhas", "/api/linhas?termo=5119"],
   ["posicao", `/api/posicao?linha=${linha.codigo}`],
-  ["paradas-linha", `/api/paradas-linha?linha=${linha.codigo}`],
+  ["paradas-linha", `/api/paradas-linha?linha=${linha.codigo}&letreiro=${encodeURIComponent(linha.letreiro)}&sentido=${linha.sentido}`],
   ...(parada ? [["previsao", `/api/previsao?parada=${parada}`]] : []),
   ["tracado", `/api/tracado?linha=${encodeURIComponent(linha.letreiro)}&destino=${encodeURIComponent(linha.destino ?? "")}&sentido=${linha.sentido}`],
   ["stops.json (estático)", "/data/stops.json"]

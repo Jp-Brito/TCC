@@ -64,7 +64,12 @@ if (!existsSync(ARQUIVO)) appendFileSync(ARQUIVO, "dataHora,rotulo,letreiro,codi
 const resultados = [];
 let feitas = 0;
 for (const l of linhas.values()) {
-  const r = await chamar("/api/paradas-linha?linha=" + l.codigo);
+  const parametros = new URLSearchParams({
+    linha: String(l.codigo),
+    letreiro: l.letreiro,
+    sentido: String(l.sentido)
+  });
+  const r = await chamar("/api/paradas-linha?" + parametros);
   const fonte = r.corpo?.fonte ?? "erro";
   const total = r.corpo?.paradas?.length ?? 0;
   resultados.push({ letreiro: l.letreiro, codigo: l.codigo, fonte, total, erro: !r.ok });
