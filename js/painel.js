@@ -807,7 +807,7 @@
   // marcados como "ausente", por até cfg.painel.retencaoMs. "recalcular" (opcional) atualiza
   // os minutos de chegada e devolve false se o ônibus já deveria ter passado.
   function manterAusentes(antigos, novos, recalcular) {
-    var agora = Date.now(), limite = cfg.painel.retencaoMs || 120000, presentes = {};
+    var agora = Date.now(), limite = (cfg && cfg.painel.retencaoMs) || 120000, presentes = {};
     novos.forEach(function (v) { v.vistoEm = agora; v.ausente = false; presentes[v.prefixo] = true; });
     (antigos || []).forEach(function (v) {
       if (presentes[v.prefixo] || !v.vistoEm || agora - v.vistoEm > limite) return;
@@ -1204,7 +1204,8 @@
     definirPosicaoUsuario: definirPosicaoUsuario,
     _teste: {
       paraMinutos: paraMinutos, minutosAte: minutosAte, textoTempo: textoTempo,
-      processar: processar, decodificarPolilinha: decodificarPolilinha, rumoNoTracado: rumoNoTracado, distanciaM: distanciaM, rumoEntre: rumoEntre, textoIdade: textoIdade
+      processar: processar, decodificarPolilinha: decodificarPolilinha, rumoNoTracado: rumoNoTracado, distanciaM: distanciaM, rumoEntre: rumoEntre, textoIdade: textoIdade,
+      diferencaAngular: diferencaAngular, manterAusentes: manterAusentes, raioParadaLinha: raioParadaLinha, textoCaminho: textoCaminho
     }
   };
 })();

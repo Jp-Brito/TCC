@@ -1,41 +1,69 @@
 # Ônibus ao Vivo SP (nome provisório)
 
-Protótipo do TCC: site em HTML e JavaScript puro, com mapa Leaflet e dados da API Olho Vivo (SPTrans), instalável como aplicativo (PWA) e hospedado na Vercel. O site e as funções do back-end ficam no mesmo projeto.
+Protótipo do TCC (Ciência da Computação, FAMOnline): aplicação web para acompanhar os ônibus
+de São Paulo em tempo real. Site em HTML e JavaScript puro com mapa Leaflet, instalável como
+aplicativo (PWA), e funções Node.js na Vercel (região `gru1`, São Paulo) que consultam a API
+Olho Vivo da SPTrans. O site e as funções ficam no mesmo projeto.
+
+Publicado em: https://olhovivobus.vercel.app
+
+## Funcionalidades
+- Mapa claro/escuro, localização do usuário e paradas (a partir do zoom 15)
+- Painel da parada: linhas, previsão de chegada e ônibus no mapa, atualizando a cada 12 s
+- Busca de linhas (lupa): ônibus em circulação, traçado e paradas da linha
+- Ônibus na cor oficial da linha, com a direção pelo traçado e pelo movimento real
+- Paradas da linha discretas, que aparecem conforme o zoom
+- Caminho a pé pelas ruas até a parada aberta, ou até a parada mais próxima da linha buscada
+- Aviso de dados desatualizados (falha, demora ou GPS parado); ônibus mantidos na última
+  posição por até 2 min, com etiqueta "⚠ há N s"
 
 ## Estrutura
-- `index.html`, `css/styles.css`, `js/` — o site (cabeçalho, mapa, localização, tema)
-- `manifest.webmanifest`, `sw.js`, `icons/` — PWA
-- `lib/olhovivo.js` — login e consultas à Olho Vivo (compartilhado)
-- `api/` — funções Node.js que o site chama:
-  - `GET /api/status` — confere o token e mede o tempo do login
-  - `GET /api/linhas?termo=8000` — busca linhas (devolve o `codigo` de cada sentido)
-  - `GET /api/posicao?linha=1273` — posição dos ônibus de uma linha
-  - `GET /api/previsao?parada=700016623` — linhas e previsões de chegada numa parada
-- `package.json`, `vercel.json`, `.gitignore`
+- `index.html`, `css/styles.css`, `js/` — o site (`app.js` mapa e localização, `painel.js` painel,
+  ônibus, traçado e caminho a pé, `busca.js` lupa, `paradas.js` índice das paradas, `config.js` ajustes)
+- `manifest.webmanifest`, `sw.js`, `icons/` — PWA (o service worker nunca guarda respostas da `/api`)
+- `api/` — funções Node.js chamadas pelo site
+- `lib/olhovivo.js` (login e consultas à Olho Vivo), `lib/gtfs.js` (cores, traçados e paradas do GTFS), `lib/csv.js`
+- `data/` — `stops.json` e `tracados.json` (gerados do GTFS) e `gtfs/*.txt` da SPTrans
+  (`shapes.txt`, com 58 MB, fica fora do Git)
+- `tools/` — scripts de geração de dados, medições e testes
 
-## Coleta automática da precisão
+## Rotas da API
+| Rota | O que devolve |
+|---|---|
+| `GET /api/status` | Confere o login na Olho Vivo e mede o tempo |
+| `GET /api/linhas?termo=5119` | Linhas encontradas, uma por sentido (`codigo`, `sentido`, `destino`, cor) |
+| `GET /api/posicao?linha=CODIGO` | Posição dos ônibus da linha |
+| `GET /api/previsao?parada=ID` | Linhas e previsões de chegada na parada |
+| `GET /api/paradas-linha?linha=CODIGO&letreiro=5119-10&sentido=1` | Paradas da linha; campo `fonte`: `paradas`, `previsao`, `gtfs-stop-times` ou `gtfs-proximidade` |
+| `GET /api/tracado?linha=5119-10&destino=&sentido=&pos=` | Traçado (polilinha codificada) do sentido certo |
+| `GET /api/rota-a-pe?de=lat,lon&para=lat,lon` | Caminho a pé pelas ruas (OpenRouteService), até 3 km |
 
-O coletor de previsões pode ficar rodando continuamente no computador. Em um PowerShell,
-execute:
+Sentido: na Olho Vivo, o sentido 1 vai para o terminal principal e o 2 para o secundário
+(conferido em 08/11/2026 com ônibus reais; corresponde às direções 0 e 1 do GTFS).
 
-```powershell
-node tools/medir-precisao-previsao.mjs --termo 5119 --duracao 0 --intervalo 15 --rotulo coleta-continua
+## Variáveis de ambiente (Vercel e `.env.local`, nunca no Git)
+- `OLHOVIVO_TOKEN` — token da API Olho Vivo
+- `ORS_KEY` — chave da OpenRouteService (rota a pé)
+
+## Scripts
 ```
-
-`--duracao 0` mantém a coleta ativa até `Ctrl+C`. Para escolher uma parada específica,
-use `--linha CODIGO --letreiro LETREIRO --parada ID`. Quando a API de paradas devolve
-uma lista incompleta, a aplicação usa a sequência oficial de `trips.txt` e
-`stop_times.txt` (fonte `gtfs-stop-times`). O fallback espacial `gtfs-proximidade`
-fica reservado para linhas sem uma viagem compatível. Os resultados são acrescentados em
-`tools/medicoes/precisao-previsao.csv`; o resumo pode ser consultado com:
-
-```powershell
-node tools/medir-precisao-previsao.mjs --resumo
+npm test                                          # testes automáticos; registra em tools/medicoes/testes.csv
+node tools/teste-api.mjs                          # testa a Olho Vivo com o .env.local
+node tools/gerar-paradas.mjs                      # data/gtfs/stops.txt -> data/stops.json
+node tools/gerar-tracados.mjs                     # shapes.txt + trips.txt -> data/tracados.json
+node tools/medir-desempenho.mjs --rodadas 20 --condicao NOME      # tempo de resposta (--resumo)
+node tools/medir-paradas-linha.mjs --amostra 80 --rotulo NOME     # linhas sem paradas na API
+node tools/medir-precisao-previsao.mjs --termo 5119 --duracao 60 --rotulo NOME   # precisão (--resumo)
+node tools/conferir-sentido.mjs                   # confere o sentido com o movimento real dos ônibus
 ```
+As medições são gravadas em `tools/medicoes/*.csv` (fora do Git). Nomes de condição e rótulo
+sem espaços nem vírgulas.
 
-Mantenha o computador conectado à internet e evite suspender o sistema durante a coleta.
+Teste de falha no navegador: `?simular=falha` (a primeira atualização funciona e as seguintes
+falham) ou `?simular=lento` (as seguintes demoram 15 s e estouram o tempo limite de 10 s).
 
 ## Créditos e licenças
-- Leaflet — biblioteca de mapas de código aberto.
-- Mapa: © OpenStreetMap contributors, © CARTO (atribuição exibida no mapa).
-- Dados de ônibus: API Olho Vivo, SPTrans.
+- Leaflet 1.9.4 — biblioteca de mapas (licença BSD-2-Clause)
+- Mapa: © OpenStreetMap contributors (ODbL), © CARTO
+- Rotas a pé: © openrouteservice.org by HeiGIT, com dados do OpenStreetMap
+- Dados de ônibus: API Olho Vivo e GTFS da SPTrans

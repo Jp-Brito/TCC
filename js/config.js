@@ -30,6 +30,7 @@ window.APP_CONFIG = {
     },
     atribuicao:
       '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
-      '&copy; <a href="https://carto.com/attributions">CARTO</a>'
+      '&copy; <a href="https://carto.com/attributions">CARTO</a> | ' +
+      'Rotas a pé: &copy; <a href="https://openrouteservice.org/">openrouteservice.org</a> by HeiGIT'
   }
 };
