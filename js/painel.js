@@ -53,6 +53,7 @@
   var sucessos = 0;        // atualizações que deram certo desde que a página abriu
   var alertaEl = null;     // faixa de aviso no topo do painel
   var LIMITE_GPS_S = 180;  // posição mais nova com mais de 3 min = GPS da SPTrans atrasado
+  var LIMITE_ETIQUETA_S = 90;  // ônibus com posição mais velha que isso ganha a etiqueta amarela
 
   /* ---------- Funções de apoio (também usadas nos testes) ---------- */
 
@@ -331,7 +332,8 @@
     var r = parseInt(cor.fundo.slice(0, 2), 16), g = parseInt(cor.fundo.slice(2, 4), 16), b = parseInt(cor.fundo.slice(4, 6), 16);
     var claridade = 0.299 * r + 0.587 * g + 0.114 * b;
     var brilho = claridade < 100 ? 0.55 : claridade < 150 ? 0.8 : 1;
-    var html = '<div class="onibus3d" style="--cor:#' + cor.fundo + ';--brilho:' + brilho + '">' + ONIBUS_SVG + '</div>';
+    var html = '<div class="onibus-etiqueta" hidden></div>' +
+      '<div class="onibus3d" style="--cor:#' + cor.fundo + ';--brilho:' + brilho + '">' + ONIBUS_SVG + '</div>';
     return L.divIcon({ className: "onibus-icone", html: html, iconSize: [56, 56], iconAnchor: [28, 28] });
   }
 
@@ -347,24 +349,44 @@
     if (onibus) onibus.style.setProperty("--rumo", alvo + "deg");
   }
 
-  // Direção do trecho do traçado mais próximo do ônibus (as linhas do GTFS seguem o
-  // sentido da viagem). Se o ônibus estiver a mais de 60 m do traçado, devolve null.
-  function rumoNoTracado(pontos, lat, lon) {
+  // Diferença entre dois rumos, em graus (0 a 180)
+  function diferencaAngular(a, b) {
+    return Math.abs(((a - b + 540) % 360) - 180);
+  }
+
+  // Direção do traçado no ponto onde o ônibus está (as linhas do GTFS seguem o sentido da
+  // viagem). Em traçados de ida e volta pela mesma rua (ex.: N842-11), o trecho mais próximo
+  // pode ser o do sentido contrário; por isso, quando o movimento do ônibus é conhecido
+  // ("dica"), escolhe entre os trechos próximos o que vai para o mesmo lado que ele. Se nenhum
+  // concordar com o movimento, devolve null e vale o movimento. Mais de 60 m do traçado: null.
+  function rumoNoTracado(pontos, lat, lon, dica) {
     var k = 111320, cos = Math.cos(lat * Math.PI / 180);
     var px = lon * k * cos, py = lat * k;
-    var menor = Infinity, rumo = null;
+    var trechos = [], menor = Infinity;
     for (var i = 0; i < pontos.length - 1; i++) {
       var ax = pontos[i][1] * k * cos, ay = pontos[i][0] * k;
       var bx = pontos[i + 1][1] * k * cos, by = pontos[i + 1][0] * k;
       var dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
       var u = l2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2)) : 0;
       var d = Math.sqrt(Math.pow(px - (ax + u * dx), 2) + Math.pow(py - (ay + u * dy), 2));
-      if (d < menor) {
-        menor = d;
-        rumo = rumoEntre({ lat: pontos[i][0], lon: pontos[i][1] }, { lat: pontos[i + 1][0], lon: pontos[i + 1][1] });
-      }
+      if (d > 60 || !l2) continue;
+      trechos.push({ d: d, i: i });
+      if (d < menor) menor = d;
     }
-    return menor <= 60 ? rumo : null;
+    if (trechos.length === 0) return null;
+    function rumoDo(t) {
+      return rumoEntre({ lat: pontos[t.i][0], lon: pontos[t.i][1] }, { lat: pontos[t.i + 1][0], lon: pontos[t.i + 1][1] });
+    }
+    if (dica === null || dica === undefined) {
+      return rumoDo(trechos.filter(function (t) { return t.d === menor; })[0]);
+    }
+    var melhor = null, melhorDif = Infinity;
+    trechos.forEach(function (t) {
+      if (t.d > menor + 25) return;               // só trechos quase tão perto quanto o mais próximo
+      var r = rumoDo(t), dif = diferencaAngular(r, dica);
+      if (dif < melhorDif) { melhorDif = dif; melhor = r; }
+    });
+    return melhorDif <= 100 ? melhor : null;
   }
 
   // Estima a direção do ônibus pelo deslocamento desde a última posição conhecida
@@ -375,7 +397,7 @@
       historico[veiculo.prefixo] = { lat: atual.lat, lon: atual.lon, rumo: null };
       return null;
     }
-    if (distanciaM(anterior, atual) >= 10) {      // andou o bastante para saber a direção
+    if (distanciaM(anterior, atual) >= 20) {      // andou o bastante para saber a direção (evita ruído do GPS)
       anterior.rumo = rumoEntre(anterior, atual);
       anterior.lat = atual.lat;
       anterior.lon = atual.lon;
@@ -576,7 +598,7 @@
 
       // Direção: primeiro pelo traçado da linha; se não houver, pelo deslocamento
       var rumoMovimento = atualizarRumo(v);
-      var rumoTracado = tracadosCache[linha.codigo] ? rumoNoTracado(tracadosCache[linha.codigo], v.lat, v.lon) : null;
+      var rumoTracado = tracadosCache[linha.codigo] ? rumoNoTracado(tracadosCache[linha.codigo], v.lat, v.lon, rumoMovimento) : null;
       var rumo = rumoTracado !== null ? rumoTracado : rumoMovimento;
       var conteudo = conteudoPopup(linha, v);
       var existente = marcadores[v.prefixo];
@@ -620,6 +642,8 @@
       }
     });
 
+    atualizarIdades();   // etiqueta amarela já no primeiro desenho
+
     // No modo linha, enquadra o traçado inteiro além dos ônibus
     if (estado.modoLinha && tracadosCache[linha.codigo]) pontos = pontos.concat(tracadosCache[linha.codigo]);
 
@@ -633,16 +657,42 @@
     }
   }
 
-  // A cada segundo, atualiza o "há N s" do pop-up que estiver aberto
+  // A cada segundo, atualiza o "há N s" do pop-up aberto e a etiqueta amarela em cima dos
+  // ônibus com dado velho: conexão falhando, ônibus que não veio na última resposta ou
+  // posição do GPS com mais de LIMITE_ETIQUETA_S segundos.
   function atualizarIdades() {
     var linha = estado.linhas.filter(function (l) { return l.codigo === estado.codigoSelecionado; })[0];
     if (!linha) return;
     linha.veiculos.forEach(function (v) {
       var m = marcadores[v.prefixo];
-      if (m && m.marcador.isPopupOpen()) {
-        m.idadeEl.textContent = textoIdade(idadeSegundos(v.atualizadoEm));
-      }
+      if (!m) return;
+      var idade = idadeSegundos(v.atualizadoEm);
+      if (m.marcador.isPopupOpen()) m.idadeEl.textContent = textoIdade(idade);
+
+      var elemento = m.marcador.getElement();
+      var etiqueta = elemento && elemento.querySelector(".onibus-etiqueta");
+      if (!etiqueta) return;
+      var velho = Boolean(estado.erro) || v.ausente || (idade !== null && idade > LIMITE_ETIQUETA_S);
+      etiqueta.hidden = !velho;
+      elemento.classList.toggle("onibus-velho", velho);
+      if (velho) etiqueta.textContent = "⚠ " + textoIdade(idade);
     });
+  }
+
+  // Junta a lista nova com os ônibus que não vieram nesta resposta mas apareceram há pouco
+  // (a SPTrans às vezes omite um ônibus por uma atualização). Eles ficam na última posição,
+  // marcados como "ausente", por até cfg.painel.retencaoMs. "recalcular" (opcional) atualiza
+  // os minutos de chegada e devolve false se o ônibus já deveria ter passado.
+  function manterAusentes(antigos, novos, recalcular) {
+    var agora = Date.now(), limite = cfg.painel.retencaoMs || 120000, presentes = {};
+    novos.forEach(function (v) { v.vistoEm = agora; v.ausente = false; presentes[v.prefixo] = true; });
+    (antigos || []).forEach(function (v) {
+      if (presentes[v.prefixo] || !v.vistoEm || agora - v.vistoEm > limite) return;
+      if (recalcular && !recalcular(v)) return;
+      v.ausente = true;
+      novos.push(v);
+    });
+    return novos;
   }
 
   // Garante que a parada não fique escondida atrás do painel
@@ -748,7 +798,27 @@
       })
       .then(function (dados) {
         if (!estado.parada || estado.parada.id !== id) return;
-        estado.linhas = processar(dados);
+        var novas = processar(dados);
+        var recalcular = function (v) {
+          v.minutos = minutosAte(v.chegada, dados.horaReferencia);
+          return v.minutos !== null;
+        };
+        estado.linhas.forEach(function (antiga) {
+          var nova = novas.filter(function (l) { return l.codigo === antiga.codigo; })[0];
+          if (nova) {
+            nova.veiculos = manterAusentes(antiga.veiculos, nova.veiculos, recalcular);
+          } else {
+            // A linha não veio nesta resposta: mantém por um tempo, com os ônibus na última posição
+            var mantidos = manterAusentes(antiga.veiculos, [], recalcular);
+            if (mantidos.length) { antiga.veiculos = mantidos; novas.push(antiga); }
+          }
+        });
+        novas.forEach(function (l) {
+          if (l.veiculos.some(function (v) { return !v.vistoEm; })) manterAusentes([], l.veiculos);
+          l.veiculos.sort(function (a, b) { return a.minutos - b.minutos; });
+        });
+        novas.sort(function (a, b) { return a.veiculos[0].minutos - b.veiculos[0].minutos; });
+        estado.linhas = novas;
         estado.horaReferencia = dados.horaReferencia;
         estado.erro = null;
         estado.ultimoSucesso = Date.now();
@@ -801,10 +871,10 @@
       .then(function (dados) {
         if (!estado.modoLinha || estado.modoLinha.codigo !== item.codigo) return;
         var linha = estado.linhas[0];
-        linha.veiculos = (dados.veiculos || []).map(function (v) {
+        linha.veiculos = manterAusentes(linha.veiculos, (dados.veiculos || []).map(function (v) {
           return { prefixo: v.prefixo, acessivel: v.acessivel, atualizadoEm: v.atualizadoEm,
                    lat: v.lat, lon: v.lon, chegada: null, minutos: null };
-        });
+        }));
         estado.horaReferencia = dados.horaReferencia;
         estado.erro = null;
         estado.ultimoSucesso = Date.now();

@@ -294,6 +294,16 @@ body.painel-aberto .leaflet-bottom { bottom: var(--altura-painel); }
 .onibus3d svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 0 5px var(--cor, #8B5CF6)); }  /* brilho na cor da linha */
 .onibus__corpo { fill: var(--cor, #8B5CF6); }
 
+/* Etiqueta amarela em cima do ônibus com dado velho (não gira junto com o ônibus) */
+.onibus-etiqueta {
+  position: absolute; left: 50%; bottom: calc(50% + 30px * var(--escala-onibus, 0.95));
+  transform: translateX(-50%); white-space: nowrap; pointer-events: none;
+  padding: 1px 6px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; line-height: 1.4;
+  background: #F59E0B; color: #1f1300; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+.onibus-etiqueta[hidden] { display: none; }
+.onibus-velho .onibus3d { opacity: 0.7; }
+
 /* Pop-up do ônibus (segue o tema) */
 .popup-tema .leaflet-popup-content-wrapper,
 .popup-tema .leaflet-popup-tip {

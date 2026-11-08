@@ -6,7 +6,8 @@ window.APP_CONFIG = {
   painel: {
     atualizacaoMs: 12000,      // intervalo entre atualizações das previsões
     atualizacaoMaxMs: 60000,   // espera máxima quando a API está falhando
-    tempoLimiteMs: 10000       // desiste de uma atualização que demora mais que isso
+    tempoLimiteMs: 10000,      // desiste de uma atualização que demora mais que isso
+    retencaoMs: 120000         // ônibus que some da resposta fica na última posição por até 2 min
   },
   paradas: {
     arquivo: "data/stops.json",
