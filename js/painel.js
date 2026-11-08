@@ -16,6 +16,10 @@
   var camadaTracado = null;        // traçado (caminho) da linha selecionada
   var camadaParadasLinha = null;   // paradas por onde a linha selecionada passa
   var paradasLinhaAtual = null;    // { codigo, lista } paradas da linha selecionada (redesenhadas no zoom)
+  var camadaCaminho = null;        // caminho a pé do usuário até a parada
+  var posUsuario = null;           // [lat, lon] da última localização (enviada pelo app.js)
+  var caminho = { alvo: null, origem: null, irParaParada: false, el: null };
+  var rotasCache = {};             // rotas a pé já calculadas (origem arredondada + parada)
   var paradasPorLinha = {};        // cache: código da linha -> paradas
   var paradasDesenhadasDe = null;  // linha cujas paradas estão desenhadas agora
   var tracadosCache = {};          // código da linha -> pontos do traçado
@@ -484,6 +488,7 @@
   function desenharParadasDaLinha(codigo, lista) {
     paradasLinhaAtual = { codigo: codigo, lista: lista || [] };
     redesenharParadasDaLinha();
+    caminhoParaLinha();
   }
 
   // Tamanho das paradas da linha pelo zoom: de longe só o traçado; de perto, todas.
@@ -520,6 +525,92 @@
       }).on("click", function () { abrir(p, codigo); })   // tocar noutra parada da linha troca o painel
         .addTo(camadaParadasLinha);
     });
+  }
+
+  /* ---------- Caminho a pé até a parada ---------- */
+  // Aparece só quando o usuário abre uma parada (caminho até ela) ou busca uma linha
+  // (caminho até a parada da linha mais próxima). Primeiro desenha uma linha reta
+  // tracejada com tempo estimado (reta + 30%, a 80 m/min); depois tenta a rota pelas ruas
+  // em api/rota-a-pe (OpenRouteService). Se a rota falhar, fica a estimativa.
+  var FATOR_RUAS = 1.3, CAMINHADA_M_MIN = 80, ROTA_MAX_M = 3000;
+
+  function textoCaminho(metros, minutos, aproximado) {
+    var m = metros >= 1000 ? (metros / 1000).toFixed(1).replace(".", ",") + " km" : Math.max(10, Math.round(metros / 10) * 10) + " m";
+    return "🚶 " + m + " · ~" + Math.max(1, minutos) + " min a pé" + (aproximado ? " (em linha reta, aproximado)" : "");
+  }
+
+  function mostrarTextoCaminho(texto) {
+    if (!caminho.el) return;
+    var nome = caminho.irParaParada && caminho.alvo ? "Parada mais próxima da linha: " + caminho.alvo.nome + " · " : "";
+    caminho.el.textContent = texto ? nome + texto : "";
+    caminho.el.hidden = !texto;
+    caminho.el.disabled = !caminho.irParaParada;
+    medirAltura();
+  }
+
+  function limparCaminho() {
+    if (camadaCaminho) camadaCaminho.clearLayers();
+    caminho.alvo = null;
+    caminho.origem = null;
+    mostrarTextoCaminho("");
+  }
+
+  function desenharLinhaCaminho(pontos, reta) {
+    camadaCaminho.clearLayers();
+    L.polyline(pontos, {
+      color: "#8B5CF6", weight: reta ? 3 : 4, opacity: 0.9,
+      dashArray: reta ? "2 8" : "1 7", lineCap: "round", lineJoin: "round", interactive: false
+    }).addTo(camadaCaminho);
+  }
+
+  // parada = destino; irParaParada = true no modo linha (tocar no texto abre a parada)
+  function mostrarCaminho(parada, irParaParada) {
+    limparCaminho();
+    if (!posUsuario || !parada || !Number.isFinite(parada.lat) || !Number.isFinite(parada.lon)) return;
+    var origem = posUsuario.slice(), destino = [parada.lat, parada.lon];
+    var reta = distanciaM({ lat: origem[0], lon: origem[1] }, { lat: destino[0], lon: destino[1] });
+    if (reta > 20000) return;                 // longe demais da parada: não faz sentido ir a pé
+    caminho.alvo = parada;
+    caminho.origem = origem;
+    caminho.irParaParada = Boolean(irParaParada);
+    desenharLinhaCaminho([origem, destino], true);
+    mostrarTextoCaminho(textoCaminho(reta, Math.round(reta * FATOR_RUAS / CAMINHADA_M_MIN), true));
+    if (reta > ROTA_MAX_M) return;
+
+    var chave = origem[0].toFixed(4) + "," + origem[1].toFixed(4) + ">" + destino[0].toFixed(5) + "," + destino[1].toFixed(5);
+    var usar = function (rota) {
+      if (caminho.alvo !== parada || !rota || !rota.pontos || rota.pontos.length < 2) return;
+      desenharLinhaCaminho(rota.pontos, false);
+      mostrarTextoCaminho(textoCaminho(rota.distanciaM, Math.round(rota.duracaoS / 60), false));
+    };
+    if (rotasCache[chave]) { usar(rotasCache[chave]); return; }
+    fetch("api/rota-a-pe?de=" + origem[0].toFixed(5) + "," + origem[1].toFixed(5) +
+          "&para=" + destino[0].toFixed(5) + "," + destino[1].toFixed(5))
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (rota) { rotasCache[chave] = rota; usar(rota); })
+      .catch(function () { /* sem rota pelas ruas: fica a linha reta aproximada */ });
+  }
+
+  // Modo linha: parada da linha mais próxima do usuário
+  function caminhoParaLinha() {
+    if (!estado.modoLinha || !posUsuario || !paradasLinhaAtual) return;
+    var melhor = null, menor = Infinity;
+    paradasLinhaAtual.lista.forEach(function (p) {
+      if (!Number.isFinite(p.lat) || !Number.isFinite(p.lon)) return;
+      var d = distanciaM({ lat: posUsuario[0], lon: posUsuario[1] }, { lat: p.lat, lon: p.lon });
+      if (d < menor) { menor = d; melhor = p; }
+    });
+    if (melhor && melhor !== caminho.alvo) mostrarCaminho(melhor, true);
+  }
+
+  // Chamada pelo app.js quando a localização muda. Refaz o caminho se andou mais de 50 m.
+  function definirPosicaoUsuario(ll) {
+    posUsuario = ll;
+    if (!ativo()) return;
+    if (caminho.alvo && caminho.origem &&
+        distanciaM({ lat: caminho.origem[0], lon: caminho.origem[1] }, { lat: ll[0], lon: ll[1] }) < 50) return;
+    if (estado.modoLinha) { caminho.alvo = null; caminhoParaLinha(); }
+    else if (estado.parada) mostrarCaminho(estado.parada, false);
   }
 
   /* ---------- Traçado da linha ---------- */
@@ -954,6 +1045,7 @@
 
     limparOnibus();
     historico = {};
+    limparCaminho();
     camadaSelecao.clearLayers();
     camadaParadasLinha.clearLayers();
     paradasLinhaAtual = null;
@@ -1009,6 +1101,7 @@
     els.painel.classList.add("aberto");
     minimizar(false);          // ao abrir uma parada, o painel começa aberto
     avisarMudanca();
+    mostrarCaminho(parada, false);
     renderizar();
     mostrarParadaAcima();
     buscar();
@@ -1029,6 +1122,7 @@
     paradasDesenhadasDe = null;
     camadaTracado.clearLayers();
     tracadoDesenhadoDe = null;
+    limparCaminho();
     els.painel.classList.remove("aberto");
     minimizar(false);
     avisarMudanca();
@@ -1059,7 +1153,18 @@
     camadaSelecao = L.layerGroup().addTo(mapa);
     camadaTracado = L.layerGroup().addTo(mapa);         // embaixo das paradas e dos ônibus
     camadaParadasLinha = L.layerGroup().addTo(mapa);
+    camadaCaminho = L.layerGroup().addTo(mapa);
     camadaOnibus = L.layerGroup().addTo(mapa);
+
+    // Linha com a distância a pé, entre o cabeçalho e a lista do painel
+    caminho.el = document.createElement("button");
+    caminho.el.type = "button";
+    caminho.el.className = "painel__caminho";
+    caminho.el.hidden = true;
+    caminho.el.addEventListener("click", function () {
+      if (caminho.irParaParada && caminho.alvo && estado.modoLinha) abrir(caminho.alvo, estado.modoLinha.codigo);
+    });
+    els.corpo.parentNode.insertBefore(caminho.el, els.corpo);
 
     // O ônibus cresce quando o mapa se aproxima e diminui quando se afasta
     function atualizarEscala() {
@@ -1096,6 +1201,7 @@
     corDaLinha: corDaLinha,
     fechar: fechar,
     estaAberto: estaAberto,
+    definirPosicaoUsuario: definirPosicaoUsuario,
     _teste: {
       paraMinutos: paraMinutos, minutosAte: minutosAte, textoTempo: textoTempo,
       processar: processar, decodificarPolilinha: decodificarPolilinha, rumoNoTracado: rumoNoTracado, distanciaM: distanciaM, rumoEntre: rumoEntre, textoIdade: textoIdade

@@ -148,7 +148,7 @@
 
   // Painel abriu: esconde as outras paradas. Painel fechou: elas voltam.
   document.addEventListener("painel:mudou", function () {
-    setTimeout(function () { desenharParadas(); desenharMaisProxima(); }, 0);
+    setTimeout(desenharParadas, 0);
   });
 
   mapa.on("moveend", desenharParadas);
@@ -156,7 +156,6 @@
   Paradas.carregar(cfg.paradas.arquivo).then(function (indice) {
     indiceParadas = indice;
     desenharParadas();
-    desenharMaisProxima();
     if (mapa.getZoom() < cfg.paradas.zoomMinimo) {
       mostrarAviso("Aproxime o mapa para ver os pontos de ônibus.");
     }
@@ -178,43 +177,6 @@
   var marcadorUsuario = null;
   var circuloPrecisao = null;
   var ultimaPosicao = null;   // [lat, lng] da última localização obtida
-
-  /* ---------- Parada mais próxima a pé ---------- */
-
-  // Liga o usuário à parada mais próxima (até 1 km) com uma linha tracejada e uma etiqueta.
-  // Estimativa simples: distância em linha reta + 30% (as ruas não são retas), andando a
-  // 80 m/min. Só aparece com o painel fechado. Rota pelas ruas fica para uma versão futura.
-  var camadaProxima = L.layerGroup().addTo(mapa);
-  var RAIO_PROXIMA_M = 1000, FATOR_RUAS = 1.3, CAMINHADA_M_MIN = 80;
-
-  function desenharMaisProxima() {
-    if (!camadaProxima) return;
-    camadaProxima.clearLayers();
-    if (!indiceParadas || !ultimaPosicao || Painel.estaAberto()) return;
-    var achada = indiceParadas.maisProxima(ultimaPosicao[0], ultimaPosicao[1], RAIO_PROXIMA_M);
-    if (!achada) return;
-    var parada = achada.parada;
-    var destino = [parada.lat, parada.lon];
-    var metros = Math.max(10, Math.round(achada.metros / 10) * 10);
-    var minutos = Math.max(1, Math.round(achada.metros * FATOR_RUAS / CAMINHADA_M_MIN));
-
-    L.polyline([ultimaPosicao, destino], {
-      color: "#8B5CF6", weight: 3, opacity: 0.9, dashArray: "2 8", lineCap: "round", interactive: false
-    }).addTo(camadaProxima);
-    L.circleMarker(destino, {
-      radius: 12, color: "#8B5CF6", weight: 3, fill: false, interactive: false
-    }).addTo(camadaProxima);
-    L.marker(destino, {
-      icon: L.divIcon({
-        className: "proxima-etiqueta",
-        html: '<span class="proxima-etiqueta__texto">Mais próxima · ' + metros + " m · ~" + minutos + " min a pé</span>",
-        iconSize: null
-      }),
-      keyboard: false,
-      zIndexOffset: 900
-    }).on("click", function () { aoSelecionarParada(parada); })
-      .addTo(camadaProxima);
-  }
 
   function desenharUsuario(pos) {
     var ll = [pos.coords.latitude, pos.coords.longitude];
@@ -241,7 +203,7 @@
       zIndexOffset: 1000
     }).addTo(mapa);
 
-    desenharMaisProxima();
+    Painel.definirPosicaoUsuario(ll);   // usado no caminho a pé até a parada
     return ll;
   }
 

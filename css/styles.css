@@ -304,15 +304,14 @@ body.painel-aberto .leaflet-bottom { bottom: var(--altura-painel); }
 .onibus-etiqueta[hidden] { display: none; }
 .onibus-velho .onibus3d { opacity: 0.7; }
 
-/* Etiqueta da parada mais próxima a pé (o Leaflet posiciona a raiz; o texto sobe acima da parada) */
-.proxima-etiqueta { background: transparent; border: 0; }
-.proxima-etiqueta__texto {
-  position: absolute; left: 0; bottom: 16px; transform: translateX(-50%);
-  white-space: nowrap; cursor: pointer;
-  padding: 4px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 700;
-  background: var(--bg-caixa); color: var(--texto-icone); border: 2px solid var(--cor-marca);
-  box-shadow: 0 2px 8px var(--sombra);
+/* Distância a pé até a parada, entre o cabeçalho e a lista do painel */
+.painel__caminho {
+  display: block; width: calc(100% - 24px); margin: 0 12px 4px; padding: 6px 10px;
+  border: 1px solid var(--borda-caixa); border-radius: 10px; background: transparent;
+  color: var(--texto-icone); font: inherit; font-size: 0.82rem; text-align: left; cursor: pointer;
 }
+.painel__caminho:disabled { cursor: default; opacity: 1; }
+.painel__caminho[hidden], .painel.minimizado .painel__caminho { display: none; }
 
 /* Pop-up do ônibus (segue o tema) */
 .popup-tema .leaflet-popup-content-wrapper,
