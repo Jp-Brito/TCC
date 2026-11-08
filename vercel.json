@@ -29,7 +29,12 @@
     },
     "api/tracado.js": {
       "includeFiles": "data/tracados.json"
+    },
+    "api/paradas-linha.js": {
+      "includeFiles": "data/{gtfs/trips.txt,gtfs/stop_times.txt,tracados.json,stops.json}"
     }
   },
-  "regions": ["gru1"]
+  "regions": [
+    "gru1"
+  ]
 }
