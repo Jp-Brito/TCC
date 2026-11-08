@@ -10,6 +10,7 @@
   --attr-bg:      rgba(21, 21, 28, 0.92);
   --attr-texto:   #c4b5fd;
   --texto-suave:  #a1a1aa;
+  --texto-alerta: #fcd34d;
 }
 :root[data-theme="light"] {
   --bg-app:       #F5F3FF;
@@ -22,6 +23,7 @@
   --attr-bg:      rgba(255, 255, 255, 0.92);
   --attr-texto:   #3B1D7A;
   --texto-suave:  #6b5b95;
+  --texto-alerta: #92400e;
 }
 
 * { box-sizing: border-box; }
@@ -242,6 +244,13 @@ body.painel-aberto .leaflet-bottom { bottom: var(--altura-painel); }
 .painel__aviso { margin: 14px 4px; text-align: center; color: var(--texto-suave); font-size: 0.95rem; }
 .painel__rodape { padding: 4px 16px 10px; font-size: 0.75rem; color: var(--texto-suave); }
 .painel__rodape:empty { display: none; }
+
+/* Aviso de dados desatualizados (falha da API ou GPS da SPTrans parado) */
+.painel__alerta {
+  margin: 8px 4px 6px; padding: 8px 10px; border-radius: 10px;
+  font-size: 0.85rem; line-height: 1.35; color: var(--texto-alerta);
+  background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.55);
+}
 
 .linha {
   display: grid;

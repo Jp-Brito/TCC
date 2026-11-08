@@ -41,8 +41,18 @@
     infoParadas: null,     // { codigo, total, fonte } paradas da linha selecionada, para o rodapé
     infoTracado: null,     // { total } pontos do traçado da linha selecionada, para o rodapé
     dataServidor: NaN,     // hora do servidor (cabeçalho Date da resposta)
-    recebidoEm: 0
+    recebidoEm: 0,
+    ultimoSucesso: 0       // quando a última atualização deu certo (Date.now), para o aviso de dado velho
   };
+
+  // Simulação de falhas para os testes do TCC. Só liga com ?simular=falha ou ?simular=lento
+  // no endereço; a primeira atualização funciona e as seguintes falham (ou demoram 15 s).
+  var simulacao = (function () {
+    try { return new URLSearchParams(location.search).get("simular"); } catch (e) { return null; }
+  })();
+  var sucessos = 0;        // atualizações que deram certo desde que a página abriu
+  var alertaEl = null;     // faixa de aviso no topo do painel
+  var LIMITE_GPS_S = 180;  // posição mais nova com mais de 3 min = GPS da SPTrans atrasado
 
   /* ---------- Funções de apoio (também usadas nos testes) ---------- */
 
@@ -206,12 +216,12 @@
     }
 
     var rodape = estado.horaReferencia ? "Atualizado às " + estado.horaReferencia : "";
-    if (estado.erro && linha.veiculos.length > 0) rodape += " · " + estado.erro;
     els.rodape.textContent = rodape + complementoRodape();
 
     var n = linha.veiculos.length;
     els.resumo.textContent = estado.carregando && n === 0 ? "Buscando os ônibus..."
       : n + (n === 1 ? " ônibus em circulação" : " ônibus em circulação");
+    if (atualizarAlerta()) els.resumo.textContent = "⚠ " + els.resumo.textContent;
     medirAltura();
   }
 
@@ -236,7 +246,6 @@
     }
 
     var rodape = estado.horaReferencia ? "Atualizado às " + estado.horaReferencia : "";
-    if (estado.erro && estado.linhas.length > 0) rodape += " · " + estado.erro;
     rodape += complementoRodape();
     els.rodape.textContent = rodape;
 
@@ -245,6 +254,7 @@
     els.resumo.textContent = selecionada
       ? selecionada.letreiro + " · " + textoTempo(selecionada.veiculos[0].minutos) + (selecionada.destino ? " · " + selecionada.destino : "")
       : (estado.carregando ? "Buscando previsões..." : "Nenhum ônibus previsto agora");
+    if (atualizarAlerta()) els.resumo.textContent = "⚠ " + els.resumo.textContent;
 
     medirAltura();
   }
@@ -647,6 +657,74 @@
 
   /* ---------- Atualização automática ---------- */
 
+  // fetch com tempo limite (cfg.painel.tempoLimiteMs) e com a simulação de falhas
+  function buscarComLimite(url, controlador) {
+    var estourou = false;
+    var relogio = setTimeout(function () { estourou = true; controlador.abort(); },
+      cfg.painel.tempoLimiteMs || 10000);
+    var espera = Promise.resolve();
+    if (simulacao && sucessos > 0) {
+      if (simulacao === "falha") {
+        clearTimeout(relogio);
+        return Promise.reject(new Error("Falha simulada"));
+      }
+      if (simulacao === "lento") espera = new Promise(function (ok) { setTimeout(ok, 15000); });
+    }
+    return espera
+      .then(function () {
+        if (controlador.signal.aborted) throw new DOMException("cancelado", "AbortError");
+        return fetch(url, { signal: controlador.signal });
+      })
+      .catch(function (erro) {
+        if (estourou) { var e = new Error("Tempo esgotado"); e.name = "TempoEsgotado"; throw e; }
+        throw erro;
+      })
+      .finally(function () { clearTimeout(relogio); });
+  }
+
+  // Texto do aviso de dado velho (vazio quando está tudo em dia)
+  function textoAlerta() {
+    var veiculos = [];
+    if (estado.modoLinha) { if (estado.linhas[0]) veiculos = estado.linhas[0].veiculos; }
+    else estado.linhas.forEach(function (l) { veiculos = veiculos.concat(l.veiculos); });
+    if (veiculos.length === 0) return "";
+
+    // 1) A atualização falhou: os dados na tela são da última vez que deu certo
+    if (estado.erro && estado.ultimoSucesso) {
+      var s = Math.round((Date.now() - estado.ultimoSucesso) / 1000);
+      return "⚠ Dados desatualizados: última atualização " + textoIdade(s) + ". " + estado.erro +
+        (estado.modoLinha ? "" : " Os tempos podem estar errados.");
+    }
+    // 2) A consulta funcionou, mas o GPS de todos os ônibus está parado há muito tempo
+    var maisNova = null;
+    veiculos.forEach(function (v) {
+      var idade = idadeSegundos(v.atualizadoEm);
+      if (idade !== null && (maisNova === null || idade < maisNova)) maisNova = idade;
+    });
+    if (maisNova !== null && maisNova > LIMITE_GPS_S) {
+      return "⚠ A SPTrans não envia posições novas " + textoIdade(maisNova) + ".";
+    }
+    return "";
+  }
+
+  // Mostra, atualiza ou tira a faixa de aviso (chamada ao desenhar e a cada segundo)
+  function atualizarAlerta() {
+    if (!els || (!estado.parada && !estado.modoLinha)) return;
+    var texto = textoAlerta();
+    if (!texto) {
+      if (alertaEl && alertaEl.parentNode) alertaEl.parentNode.removeChild(alertaEl);
+      alertaEl = null;
+    } else {
+      if (!alertaEl || alertaEl.parentNode !== els.corpo) {
+        alertaEl = el("p", "painel__alerta", "");
+        alertaEl.setAttribute("role", "status");
+        els.corpo.insertBefore(alertaEl, els.corpo.firstChild);
+      }
+      alertaEl.textContent = texto;
+    }
+    return texto;
+  }
+
   function agendar(ms) {
     clearTimeout(estado.timer);
     estado.timer = setTimeout(estado.modoLinha ? buscarLinha : buscar, ms);
@@ -661,7 +739,7 @@
     estado.controlador = controlador;
     var id = estado.parada.id;
 
-    fetch("api/previsao?parada=" + encodeURIComponent(id), { signal: controlador.signal })
+    buscarComLimite("api/previsao?parada=" + encodeURIComponent(id), controlador)
       .then(function (r) {
         if (!r.ok) throw new Error("HTTP " + r.status);
         estado.dataServidor = Date.parse(r.headers.get("Date"));
@@ -673,6 +751,8 @@
         estado.linhas = processar(dados);
         estado.horaReferencia = dados.horaReferencia;
         estado.erro = null;
+        estado.ultimoSucesso = Date.now();
+        sucessos++;
         estado.carregando = false;
         estado.atrasoMs = cfg.painel.atualizacaoMs;
 
@@ -690,7 +770,8 @@
         if (erro.name === "AbortError") return;
         if (!estado.parada || estado.parada.id !== id) return;
         estado.carregando = false;
-        estado.erro = "Não foi possível atualizar as previsões.";
+        estado.erro = erro.name === "TempoEsgotado" ? "A SPTrans demorou para responder."
+          : "Não foi possível atualizar as previsões.";
         // Espera cada vez mais entre as tentativas, até um limite
         estado.atrasoMs = Math.min((estado.atrasoMs || cfg.painel.atualizacaoMs) * 2, cfg.painel.atualizacaoMaxMs);
         renderizar();
@@ -710,7 +791,7 @@
     var controlador = new AbortController();
     estado.controlador = controlador;
 
-    fetch("api/posicao?linha=" + encodeURIComponent(item.codigo), { signal: controlador.signal })
+    buscarComLimite("api/posicao?linha=" + encodeURIComponent(item.codigo), controlador)
       .then(function (r) {
         if (!r.ok) throw new Error("HTTP " + r.status);
         estado.dataServidor = Date.parse(r.headers.get("Date"));
@@ -726,6 +807,8 @@
         });
         estado.horaReferencia = dados.horaReferencia;
         estado.erro = null;
+        estado.ultimoSucesso = Date.now();
+        sucessos++;
         estado.carregando = false;
         estado.atrasoMs = cfg.painel.atualizacaoMs;
         renderizar();
@@ -736,7 +819,8 @@
         if (erro.name === "AbortError") return;
         if (!estado.modoLinha || estado.modoLinha.codigo !== item.codigo) return;
         estado.carregando = false;
-        estado.erro = "Não foi possível atualizar os ônibus.";
+        estado.erro = erro.name === "TempoEsgotado" ? "A SPTrans demorou para responder."
+          : "Não foi possível atualizar os ônibus.";
         estado.atrasoMs = Math.min((estado.atrasoMs || cfg.painel.atualizacaoMs) * 2, cfg.painel.atualizacaoMaxMs);
         renderizar();
         agendar(estado.atrasoMs);
@@ -755,6 +839,7 @@
     estado.codigoSelecionado = item.codigo;
     estado.horaReferencia = null;
     estado.erro = null;
+    estado.ultimoSucesso = 0;
     estado.carregando = true;
     estado.ajustarMapa = true;
     estado.atrasoMs = cfg.painel.atualizacaoMs;
@@ -795,6 +880,7 @@
     estado.codigoSelecionado = linhaPreferida || null;
     estado.horaReferencia = null;
     estado.erro = null;
+    estado.ultimoSucesso = 0;
     estado.carregando = true;
     estado.ajustarMapa = false;
     estado.atrasoMs = cfg.painel.atualizacaoMs;
@@ -884,7 +970,7 @@
     });
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") fechar(); });
     window.addEventListener("resize", medirAltura);
-    setInterval(atualizarIdades, 1000);
+    setInterval(function () { atualizarIdades(); atualizarAlerta(); }, 1000);
 
     // Ao voltar para a aba, atualiza na hora
     document.addEventListener("visibilitychange", function () {

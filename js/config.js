@@ -5,7 +5,8 @@ window.APP_CONFIG = {
   sigla: "OVSP",
   painel: {
     atualizacaoMs: 12000,      // intervalo entre atualizações das previsões
-    atualizacaoMaxMs: 60000    // espera máxima quando a API está falhando
+    atualizacaoMaxMs: 60000,   // espera máxima quando a API está falhando
+    tempoLimiteMs: 10000       // desiste de uma atualização que demora mais que isso
   },
   paradas: {
     arquivo: "data/stops.json",
