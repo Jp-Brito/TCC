@@ -20,8 +20,10 @@ export default async function handler(req, res) {
       letreiro: l.c,
       cor: corDaLinha(l.c),    // cor de fundo em hexadecimal, ou null
       sentido: l.sl,
-      destino: l.lt0,
-      origem: l.lt1,
+      // lt0 e lt1 são fixos por linha (principal e secundário), não mudam com o sentido.
+      // Sentido 1 vai para lt0; sentido 2 vai para lt1 (conferido em 08/11/2026).
+      destino: l.sl === 1 ? l.lt0 : l.lt1,
+      origem: l.sl === 1 ? l.lt1 : l.lt0,
       veiculos: (l.vs ?? []).map((v) => ({
         prefixo: String(v.p),
         chegada: v.t,          // horário previsto, "HH:MM"

@@ -18,12 +18,14 @@ export default async function handler(req, res) {
     const linhas = (Array.isArray(dados) ? dados : []).map((l) => ({
       codigo: l.cl,                      // código único da linha (por sentido)
       letreiro: `${l.lt}-${l.tl}`,       // ex.: 8000-10
-      sentido: l.sl,                     // 1 = principal -> secundário, 2 = o inverso
+      sentido: l.sl,                     // 1 = vai para o terminal principal, 2 = vai para o secundário
       circular: l.lc,
       cor: corDaLinha(`${l.lt}-${l.tl}`),   // cor oficial da linha (GTFS), ou null
       terminalPrincipal: l.tp,
       terminalSecundario: l.ts,
-      destino: l.sl === 1 ? l.ts : l.tp  // derivado: conferir nos testes
+      // Conferido em 08/11/2026 (5119-10): o sentido 1 aparece nas paradas "B/C" e
+      // termina no terminal principal (Lgo. São Francisco), como a direção 0 do GTFS.
+      destino: l.sl === 1 ? l.tp : l.ts
     }));
 
     enviarJson(res, 200, { linhas });
