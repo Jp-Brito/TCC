@@ -42,15 +42,16 @@
     infoTracado: null,     // { total } pontos do traçado da linha selecionada, para o rodapé
     dataServidor: NaN,     // hora do servidor (cabeçalho Date da resposta)
     recebidoEm: 0,
+    proximaEm: 0,          // quando será a próxima tentativa (Date.now)
     ultimoSucesso: 0       // quando a última atualização deu certo (Date.now), para o aviso de dado velho
   };
 
   // Simulação de falhas para os testes do TCC. Só liga com ?simular=falha ou ?simular=lento
-  // no endereço; a primeira atualização funciona e as seguintes falham (ou demoram 15 s).
+  // no endereço; em cada parada ou linha aberta, a primeira atualização funciona e as
+  // seguintes falham (ou demoram 15 s).
   var simulacao = (function () {
     try { return new URLSearchParams(location.search).get("simular"); } catch (e) { return null; }
   })();
-  var sucessos = 0;        // atualizações que deram certo desde que a página abriu
   var alertaEl = null;     // faixa de aviso no topo do painel
   var LIMITE_GPS_S = 180;  // posição mais nova com mais de 3 min = GPS da SPTrans atrasado
   var LIMITE_ETIQUETA_S = 90;  // ônibus com posição mais velha que isso ganha a etiqueta amarela
@@ -196,7 +197,7 @@
     if (estado.carregando && linha.veiculos.length === 0) {
       els.corpo.appendChild(el("p", "painel__aviso", "Buscando os ônibus da linha..."));
     } else if (estado.erro && linha.veiculos.length === 0) {
-      els.corpo.appendChild(el("p", "painel__aviso", estado.erro));
+      // a faixa amarela (atualizarAlerta) explica a falha
     } else if (linha.veiculos.length === 0) {
       els.corpo.appendChild(el("p", "painel__aviso", "Nenhum ônibus em circulação nesta linha agora."));
     } else {
@@ -237,7 +238,7 @@
     if (estado.carregando && estado.linhas.length === 0) {
       els.corpo.appendChild(el("p", "painel__aviso", "Buscando previsões..."));
     } else if (estado.erro && estado.linhas.length === 0) {
-      els.corpo.appendChild(el("p", "painel__aviso", estado.erro));
+      // a faixa amarela (atualizarAlerta) explica a falha
     } else if (estado.linhas.length === 0) {
       els.corpo.appendChild(el("p", "painel__aviso", "Nenhum ônibus previsto para este ponto agora."));
     } else {
@@ -713,7 +714,7 @@
     var relogio = setTimeout(function () { estourou = true; controlador.abort(); },
       cfg.painel.tempoLimiteMs || 10000);
     var espera = Promise.resolve();
-    if (simulacao && sucessos > 0) {
+    if (simulacao && estado.ultimoSucesso) {
       if (simulacao === "falha") {
         clearTimeout(relogio);
         return Promise.reject(new Error("Falha simulada"));
@@ -737,7 +738,12 @@
     var veiculos = [];
     if (estado.modoLinha) { if (estado.linhas[0]) veiculos = estado.linhas[0].veiculos; }
     else estado.linhas.forEach(function (l) { veiculos = veiculos.concat(l.veiculos); });
-    if (veiculos.length === 0) return "";
+    if (veiculos.length === 0) {
+      // Nada carregado ainda e a consulta falhou: avisa e mostra quando tenta de novo
+      if (!estado.erro) return "";
+      var faltam = Math.max(0, Math.ceil((estado.proximaEm - Date.now()) / 1000));
+      return "⚠ Sem resposta da SPTrans. Tentando de novo " + (faltam > 0 ? "em " + faltam + " s." : "agora...");
+    }
 
     // 1) A atualização falhou: os dados na tela são da última vez que deu certo
     if (estado.erro && estado.ultimoSucesso) {
@@ -777,6 +783,7 @@
 
   function agendar(ms) {
     clearTimeout(estado.timer);
+    estado.proximaEm = Date.now() + ms;   // usado no aviso "tentando de novo em N s"
     estado.timer = setTimeout(estado.modoLinha ? buscarLinha : buscar, ms);
   }
 
@@ -822,7 +829,6 @@
         estado.horaReferencia = dados.horaReferencia;
         estado.erro = null;
         estado.ultimoSucesso = Date.now();
-        sucessos++;
         estado.carregando = false;
         estado.atrasoMs = cfg.painel.atualizacaoMs;
 
@@ -878,7 +884,6 @@
         estado.horaReferencia = dados.horaReferencia;
         estado.erro = null;
         estado.ultimoSucesso = Date.now();
-        sucessos++;
         estado.carregando = false;
         estado.atrasoMs = cfg.painel.atualizacaoMs;
         renderizar();
