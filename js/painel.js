@@ -306,8 +306,102 @@
   /* ---------- Ônibus no mapa (setinha + pop-up) ---------- */
 
   function limparOnibus() {
+    Object.keys(marcadores).forEach(function (k) { pararAnimacao(marcadores[k]); });
     camadaOnibus.clearLayers();
     marcadores = {};
+  }
+
+  /* ---------- Animação suave do ônibus até a nova posição ---------- */
+  // Quando chega uma posição nova, o ônibus desliza até ela em ANIMACAO_MS seguindo o
+  // traçado da linha (ou em reta, se não estiver nele). Não inventa posição: termina
+  // exatamente no ponto informado pela SPTrans. Saltos grandes, aba escondida ou zoom
+  // de longe: vai direto, sem animar.
+  var ANIMACAO_MS = 1500, SALTO_MAX_M = 500, ZOOM_MIN_ANIMACAO = 13;
+
+  // Ponto do traçado mais próximo de (lat, lon): índice do trecho, posição no trecho (0 a 1),
+  // distância em metros e o ponto projetado.
+  function projetarNoTracado(pontos, lat, lon) {
+    var k = 111320, cos = Math.cos(lat * Math.PI / 180);
+    var px = lon * k * cos, py = lat * k, melhor = null;
+    for (var i = 0; i < pontos.length - 1; i++) {
+      var ax = pontos[i][1] * k * cos, ay = pontos[i][0] * k;
+      var bx = pontos[i + 1][1] * k * cos, by = pontos[i + 1][0] * k;
+      var dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+      var u = l2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2)) : 0;
+      var d = Math.sqrt(Math.pow(px - (ax + u * dx), 2) + Math.pow(py - (ay + u * dy), 2));
+      if (!melhor || d < melhor.d) {
+        melhor = { i: i, u: u, d: d, ponto: [pontos[i][0] + u * (pontos[i + 1][0] - pontos[i][0]),
+                                              pontos[i][1] + u * (pontos[i + 1][1] - pontos[i][1])] };
+      }
+    }
+    return melhor;
+  }
+
+  function comprimentoM(caminho) {
+    var total = 0;
+    for (var i = 1; i < caminho.length; i++) {
+      total += distanciaM({ lat: caminho[i - 1][0], lon: caminho[i - 1][1] }, { lat: caminho[i][0], lon: caminho[i][1] });
+    }
+    return total;
+  }
+
+  // Pedaço do traçado entre a posição antiga (a) e a nova (b). Devolve null (usar reta) se
+  // algum dos dois estiver a mais de 40 m do traçado, se b ficar "para trás" de a no sentido
+  // do traçado, ou se o pedaço for muito mais longo que a reta (ex.: lado errado de um laço).
+  function trechoNoTracado(pontos, a, b) {
+    if (!pontos || pontos.length < 2) return null;
+    var pa = projetarNoTracado(pontos, a[0], a[1]), pb = projetarNoTracado(pontos, b[0], b[1]);
+    if (!pa || !pb || pa.d > 40 || pb.d > 40) return null;
+    if (pb.i + pb.u < pa.i + pa.u) return null;
+    var caminho = [a, pa.ponto];
+    for (var i = pa.i + 1; i <= pb.i; i++) caminho.push(pontos[i]);
+    caminho.push(pb.ponto, b);
+    var reta = distanciaM({ lat: a[0], lon: a[1] }, { lat: b[0], lon: b[1] });
+    return comprimentoM(caminho) <= reta * 3 + 50 ? caminho : null;
+  }
+
+  // Ponto a uma fração (0 a 1) do comprimento de um caminho
+  function pontoNaFracao(caminho, comprimentos, total, f) {
+    var alvo = total * f;
+    for (var i = 1; i < caminho.length; i++) {
+      if (comprimentos[i] >= alvo) {
+        var trecho = comprimentos[i] - comprimentos[i - 1];
+        var t = trecho ? (alvo - comprimentos[i - 1]) / trecho : 1;
+        return [caminho[i - 1][0] + t * (caminho[i][0] - caminho[i - 1][0]),
+                caminho[i - 1][1] + t * (caminho[i][1] - caminho[i - 1][1])];
+      }
+    }
+    return caminho[caminho.length - 1];
+  }
+
+  function pararAnimacao(registro) {
+    if (registro && registro.animacao) { cancelAnimationFrame(registro.animacao); registro.animacao = null; }
+  }
+
+  function moverSuave(registro, destino, pontosTracado) {
+    pararAnimacao(registro);
+    var atual = registro.marcador.getLatLng(), origem = [atual.lat, atual.lng];
+    var reta = distanciaM({ lat: origem[0], lon: origem[1] }, { lat: destino[0], lon: destino[1] });
+    if (reta < 2 || reta > SALTO_MAX_M || document.hidden || mapa.getZoom() < ZOOM_MIN_ANIMACAO ||
+        typeof requestAnimationFrame !== "function") {
+      registro.marcador.setLatLng(destino);
+      return;
+    }
+    var caminho = trechoNoTracado(pontosTracado, origem, destino) || [origem, destino];
+    var comprimentos = [0];
+    for (var i = 1; i < caminho.length; i++) {
+      comprimentos.push(comprimentos[i - 1] + distanciaM({ lat: caminho[i - 1][0], lon: caminho[i - 1][1] },
+                                                        { lat: caminho[i][0], lon: caminho[i][1] }));
+    }
+    var total = comprimentos[comprimentos.length - 1], inicio = null;
+    function quadro(agora) {
+      if (inicio === null) inicio = agora;
+      var t = Math.min(1, (agora - inicio) / ANIMACAO_MS);
+      var f = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;   // começa e termina devagar
+      registro.marcador.setLatLng(t >= 1 ? destino : pontoNaFracao(caminho, comprimentos, total, f));
+      registro.animacao = t < 1 ? requestAnimationFrame(quadro) : null;
+    }
+    registro.animacao = requestAnimationFrame(quadro);
   }
 
   // Ônibus visto de cima (a frente fica para cima), com teto, para-brisa, faróis e
@@ -727,7 +821,7 @@
       var existente = marcadores[v.prefixo];
 
       if (existente) {
-        existente.marcador.setLatLng([v.lat, v.lon]);
+        moverSuave(existente, [v.lat, v.lon], tracadosCache[linha.codigo]);
         definirRumo(existente, rumo);
         existente.popup.setContent(conteudo.raiz);   // atualiza sem fechar o pop-up
         existente.idadeEl = conteudo.idadeEl;
@@ -760,6 +854,7 @@
     // Remove ônibus que saíram da lista
     Object.keys(marcadores).forEach(function (prefixo) {
       if (!presentes[prefixo]) {
+        pararAnimacao(marcadores[prefixo]);
         camadaOnibus.removeLayer(marcadores[prefixo].marcador);
         delete marcadores[prefixo];
       }
@@ -1205,7 +1300,8 @@
     _teste: {
       paraMinutos: paraMinutos, minutosAte: minutosAte, textoTempo: textoTempo,
       processar: processar, decodificarPolilinha: decodificarPolilinha, rumoNoTracado: rumoNoTracado, distanciaM: distanciaM, rumoEntre: rumoEntre, textoIdade: textoIdade,
-      diferencaAngular: diferencaAngular, manterAusentes: manterAusentes, raioParadaLinha: raioParadaLinha, textoCaminho: textoCaminho
+      diferencaAngular: diferencaAngular, manterAusentes: manterAusentes, raioParadaLinha: raioParadaLinha, textoCaminho: textoCaminho,
+      trechoNoTracado: trechoNoTracado
     }
   };
 })();

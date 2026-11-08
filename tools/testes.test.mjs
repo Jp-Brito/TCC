@@ -69,6 +69,16 @@ caso("ônibus ausente na resposta fica por até 2 min", () => {
   assert.deepEqual(simples(lista.map((v) => v.prefixo + (v.ausente ? "*" : ""))), ["3", "1*"]);
 });
 
+caso("animação: o ônibus desliza pelo traçado, não pela reta", () => {
+  // traçado em "L": leste e depois norte (uma esquina)
+  const tracado = [[0, 0], [0, 0.002], [0.002, 0.002]];
+  const caminho = simples(P.trechoNoTracado(tracado, [0, 0.0005], [0.0015, 0.002]));
+  assert.ok(caminho.some(([a, b]) => a === 0 && b === 0.002), "passa pela esquina");
+  assert.deepEqual(caminho.at(-1), [0.0015, 0.002]);        // termina na posição real
+  assert.equal(P.trechoNoTracado(tracado, [0.0015, 0.002], [0, 0.0005]), null);   // andando "para trás": reta
+  assert.equal(P.trechoNoTracado(tracado, [0.01, 0.01], [0, 0.0005]), null);      // fora do traçado: reta
+});
+
 caso("paradas da linha: tamanho pelo zoom", () => {
   assert.equal(P.raioParadaLinha(13), 0);
   assert.ok(P.raioParadaLinha(14) < P.raioParadaLinha(16));
