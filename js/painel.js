@@ -15,6 +15,7 @@
   var camadaSelecao = null;
   var camadaTracado = null;        // traçado (caminho) da linha selecionada
   var camadaParadasLinha = null;   // paradas por onde a linha selecionada passa
+  var paradasLinhaAtual = null;    // { codigo, lista } paradas da linha selecionada (redesenhadas no zoom)
   var paradasPorLinha = {};        // cache: código da linha -> paradas
   var paradasDesenhadasDe = null;  // linha cujas paradas estão desenhadas agora
   var tracadosCache = {};          // código da linha -> pontos do traçado
@@ -439,6 +440,7 @@
     if (codigo === paradasDesenhadasDe) return;
     paradasDesenhadasDe = codigo;
     camadaParadasLinha.clearLayers();
+    paradasLinhaAtual = null;
     estado.infoParadas = null;
     if (codigo === null || codigo === undefined) return;
 
@@ -480,12 +482,41 @@
   }
 
   function desenharParadasDaLinha(codigo, lista) {
+    paradasLinhaAtual = { codigo: codigo, lista: lista || [] };
+    redesenharParadasDaLinha();
+  }
+
+  // Tamanho das paradas da linha pelo zoom: de longe só o traçado; de perto, todas.
+  function raioParadaLinha(zoom) {
+    if (zoom <= 13) return 0;
+    if (zoom === 14) return 2.5;
+    if (zoom === 15) return 3.5;
+    if (zoom === 16) return 4.5;
+    return 6;
+  }
+
+  // Paradas da linha como "contas" sobre o traçado: brancas, com borda na cor da linha.
+  // Nos zooms 14 e 15, paradas a menos de 20 px de outra já desenhada são puladas.
+  // Chamada ao trocar de linha e a cada zoom.
+  function redesenharParadasDaLinha() {
     camadaParadasLinha.clearLayers();
-    (lista || []).forEach(function (p) {
-      if (!ativo() || (estado.parada && p.id === estado.parada.id)) return;   // a escolhida já está destacada
+    if (!paradasLinhaAtual || !ativo()) return;
+    var zoom = mapa.getZoom(), raio = raioParadaLinha(zoom);
+    if (!raio) return;
+    var codigo = paradasLinhaAtual.codigo;
+    var linha = estado.linhas.filter(function (l) { return l.codigo === codigo; })[0] || estado.modoLinha;
+    var borda = "#" + escurecer(corDaLinha(linha && linha.cor).fundo, 0.8);
+    var desenhadas = [];
+    paradasLinhaAtual.lista.forEach(function (p) {
+      if (estado.parada && p.id === estado.parada.id) return;   // a escolhida já está destacada
       if (!Number.isFinite(p.lat) || !Number.isFinite(p.lon)) return;
+      if (zoom <= 15) {
+        var ponto = mapa.project([p.lat, p.lon], zoom);
+        if (desenhadas.some(function (q) { return q.distanceTo(ponto) < 20; })) return;
+        desenhadas.push(ponto);
+      }
       L.circleMarker([p.lat, p.lon], {
-        radius: 7, color: "#ffffff", weight: 2, fillColor: "#8B5CF6", fillOpacity: 1
+        radius: raio, color: borda, weight: zoom >= 16 ? 2 : 1.5, fillColor: "#ffffff", fillOpacity: 1
       }).on("click", function () { abrir(p, codigo); })   // tocar noutra parada da linha troca o painel
         .addTo(camadaParadasLinha);
     });
@@ -925,6 +956,7 @@
     historico = {};
     camadaSelecao.clearLayers();
     camadaParadasLinha.clearLayers();
+    paradasLinhaAtual = null;
     camadaTracado.clearLayers();
     paradasDesenhadasDe = null;
     tracadoDesenhadoDe = null;
@@ -993,6 +1025,7 @@
     historico = {};
     camadaSelecao.clearLayers();
     camadaParadasLinha.clearLayers();
+    paradasLinhaAtual = null;
     paradasDesenhadasDe = null;
     camadaTracado.clearLayers();
     tracadoDesenhadoDe = null;
@@ -1034,6 +1067,7 @@
       mapa.getContainer().style.setProperty("--escala-onibus", escala.toFixed(3));
     }
     mapa.on("zoom zoomend", atualizarEscala);
+    mapa.on("zoomend", redesenharParadasDaLinha);
     atualizarEscala();
 
     document.getElementById("painelFechar").addEventListener("click", fechar);
