@@ -32,11 +32,60 @@
     return raiz.getAttribute("data-theme") === "light" ? "light" : "dark";
   }
 
+  // Quem ativou "reduzir movimento" no aparelho fica com a troca instantânea
+  function reduzirMovimento() {
+    return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  var timerTema = null;
   function aplicarTema(tema) {
+    // Durante a troca, as cores da interface mudam aos poucos (classe "trocando-tema" no CSS)
+    if (!reduzirMovimento()) {
+      raiz.classList.add("trocando-tema");
+      clearTimeout(timerTema);
+      timerTema = setTimeout(function () { raiz.classList.remove("trocando-tema"); }, 700);
+    }
     raiz.setAttribute("data-theme", tema);
     document.getElementById("metaTema").setAttribute("content", COR_BARRA[tema]);
     try { localStorage.setItem("busjp-tema", tema); } catch (e) {}
-    if (camadaMapa) camadaMapa.setUrl(cfg.mapa.urlTiles(tema));
+    if (camadaMapa) trocarMapa(tema);
+  }
+
+  // Troca o mapa sem clarão: o mapa do tema novo carrega por cima, invisível, e vai
+  // aparecendo em ~0,6 s; depois o antigo é removido.
+  var camadaSaindo = null, camadaZ = 1;
+  function trocarMapa(tema) {
+    if (camadaSaindo && mapa.hasLayer(camadaSaindo)) mapa.removeLayer(camadaSaindo);   // troca rápida repetida
+    var antiga = camadaMapa;
+    var instantaneo = reduzirMovimento();
+    var nova = L.tileLayer(cfg.mapa.urlTiles(tema), {
+      attribution: cfg.mapa.atribuicao,
+      detectRetina: true,
+      maxZoom: cfg.mapa.zoomMax,
+      opacity: instantaneo ? 1 : 0,
+      zIndex: ++camadaZ
+    });
+    camadaMapa = nova;
+    camadaSaindo = antiga;
+    nova.addTo(mapa);
+    if (instantaneo) { mapa.removeLayer(antiga); return; }
+
+    var comecou = false;
+    function aparecer() {
+      if (comecou || camadaMapa !== nova) return;
+      comecou = true;
+      var inicio = null;
+      function quadro(agora) {
+        if (inicio === null) inicio = agora;
+        var f = Math.min(1, (agora - inicio) / 600);
+        nova.setOpacity(f * f * (3 - 2 * f));   // começa e termina devagar
+        if (f < 1) { requestAnimationFrame(quadro); return; }
+        if (mapa.hasLayer(antiga)) mapa.removeLayer(antiga);
+      }
+      requestAnimationFrame(quadro);
+    }
+    nova.once("load", aparecer);
+    setTimeout(aparecer, 2500);   // se a internet estiver lenta, aparece mesmo assim
   }
 
   /* ---------- Mapa ---------- */
