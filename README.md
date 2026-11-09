@@ -37,6 +37,8 @@ Publicado em: https://olhovivobus.vercel.app
 | `GET /api/paradas-linha?linha=CODIGO&letreiro=5119-10&sentido=1` | Paradas da linha; campo `fonte`: `paradas`, `previsao`, `gtfs-stop-times` ou `gtfs-proximidade` |
 | `GET /api/tracado?linha=5119-10&destino=&sentido=&pos=` | Traçado (polilinha codificada) do sentido certo |
 | `GET /api/rota-a-pe?de=lat,lon&para=lat,lon` | Caminho a pé pelas ruas (OpenRouteService), até 3 km |
+| `GET /api/trilhos` | Linhas de metrô e trem: cor, traçado, estações e intervalos programados (GTFS) |
+| `GET /api/situacao-trilhos` | Situação das linhas de metrô e trem, lida do site da ViaMobilidade (não oficial; cache de 2 min) |
 
 Sentido: na Olho Vivo, o sentido 1 vai para o terminal principal e o 2 para o secundário
 (conferido em 08/11/2026 com ônibus reais; corresponde às direções 0 e 1 do GTFS).
@@ -66,4 +68,6 @@ falham) ou `?simular=lento` (as seguintes demoram 15 s e estouram o tempo limite
 - Leaflet 1.9.4 — biblioteca de mapas (licença BSD-2-Clause)
 - Mapa: © OpenStreetMap contributors (ODbL), © CARTO
 - Rotas a pé: © openrouteservice.org by HeiGIT, com dados do OpenStreetMap
-- Dados de ônibus: API Olho Vivo e GTFS da SPTrans
+- Dados de ônibus, metrô e trem: API Olho Vivo e GTFS da SPTrans
+- Situação das linhas de metrô e trem: site da ViaMobilidade (leitura não oficial), ideia baseada no
+  projeto [metro-sp-api](https://github.com/ale-jr/metro-sp-api) de ale-jr (licença MIT)

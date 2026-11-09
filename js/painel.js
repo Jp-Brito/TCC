@@ -265,6 +265,35 @@
     return { atual: atual, proxima: proxima };
   }
 
+  // Situação das linhas (api/situacao-trilhos, fonte não oficial). Guardada por 2 min.
+  var situacao = { dados: null, em: 0, carregando: false };
+  var TEXTO_SITUACAO = { normal: "Operação normal", reduzida: "Velocidade reduzida", paralisada: "Paralisada",
+                         encerrada: "Operação encerrada", outra: "" };
+
+  function carregarSituacao() {
+    if (situacao.carregando || (situacao.dados && Date.now() - situacao.em < 120000)) return;
+    situacao.carregando = true;
+    fetch("api/situacao-trilhos")
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (dados) { situacao.dados = dados; situacao.em = Date.now(); })
+      .catch(function () { /* sem situação: a estação aparece sem essa linha */ })
+      .then(function () {
+        situacao.carregando = false;
+        if (estado.estacao) renderizar();
+      });
+  }
+
+  function situacaoDaLinha(numero) {
+    if (!situacao.dados) return null;
+    return situacao.dados.linhas.filter(function (l) { return l.numero === numero; })[0] || null;
+  }
+
+  function horaDe(iso) {
+    var t = Date.parse(iso);
+    if (!Number.isFinite(t)) return "";
+    return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }).format(new Date(t));
+  }
+
   function renderizarEstacao() {
     var est = estado.estacao, agora = minutoAgoraSP();
     els.titulo.textContent = "Estação " + est.nome;
@@ -272,7 +301,17 @@
     els.corpo.textContent = "";
     var resumo = "";
 
+    var temSituacao = false;
     est.linhas.forEach(function (linha) {
+      var sit = situacaoDaLinha(linha.numero);
+      if (sit) {
+        temSituacao = true;
+        var hora = horaDe(situacao.dados.atualizadoEm || situacao.dados.consultadoEm);
+        var texto = (TEXTO_SITUACAO[sit.situacao] || sit.descricao) + (est.linhas.length > 1 ? " na linha " + linha.numero : "") +
+          (hora ? " · atualizado às " + hora : "");
+        els.corpo.appendChild(el("p", "estacao__situacao estacao__situacao--" + sit.situacao, texto));
+        if (sit.motivo && sit.situacao !== "normal") els.corpo.appendChild(el("p", "estacao__motivo", sit.motivo));
+      }
       linha.sentidos.forEach(function (s) {
         var sit = situacaoSentido(s.faixas, agora);
         var item = el("div", "linha linha--estacao");
@@ -304,7 +343,8 @@
       }
     });
 
-    els.rodape.textContent = "Horários programados (GTFS da SPTrans). O Metrô e a CPTM não publicam a posição dos trens em tempo real.";
+    els.rodape.textContent = "Horários programados (GTFS da SPTrans). O Metrô e a CPTM não publicam a posição dos trens em tempo real." +
+      (temSituacao ? " Situação das linhas: site da ViaMobilidade (fonte não oficial)." : "");
     els.resumo.textContent = resumo || "Programação indisponível";
     medirAltura();
   }
@@ -346,6 +386,7 @@
     minimizar(false);
     avisarMudanca();
     mostrarCaminho(est, false);
+    carregarSituacao();
     renderizar();
   }
 

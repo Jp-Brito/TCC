@@ -12,6 +12,7 @@ import linhas from "../api/linhas.js";
 import previsao from "../api/previsao.js";
 import rotaAPe from "../api/rota-a-pe.js";
 import trilhos from "../api/trilhos.js";
+import { lerSituacao } from "../api/situacao-trilhos.js";
 
 process.env.OLHOVIVO_TOKEN = "token-de-teste";   // só para os testes; a Olho Vivo é simulada
 
@@ -200,4 +201,18 @@ caso("trilhos: cada linha traz os dois sentidos com a programação", () => {
   assert.equal(l9.sentidos.length, 2);
   assert.ok(l9.sentidos.every((s) => s.faixas.length > 10 && s.destino));
   assert.ok(l9.estacoes.some((e) => e.nome === "Ceasa"));
+});
+
+caso("situação das linhas: lê o quadro do site (HTML de exemplo)", () => {
+  const html = `<div class="lines"><p>Atualizado em <strong>09/11/2026 16:55:12</strong></p><ul>
+    <li class="item line-4"><span title="Amarela">4</span><span class="status green">Opera&ccedil;&atilde;o Normal</span></li>
+    <li class="item line-9"><span title="Esmeralda">9</span><span class="status yellow">Velocidade Reduzida</span><p>Falha em equipamento</p></li>
+    <li class="item line-12"><span title="Safira">12</span><span class="status red">Paralisada</span></li></ul></div>`;
+  const d = lerSituacao(html);
+  assert.equal(d.linhas.length, 3);
+  assert.deepEqual(d.linhas.map((l) => l.situacao), ["normal", "reduzida", "paralisada"]);
+  assert.equal(d.linhas[0].descricao, "Operação Normal");
+  assert.equal(d.linhas[1].motivo, "Falha em equipamento");
+  assert.equal(d.atualizadoEm, "2026-11-09T16:55:12-03:00");
+  assert.equal(lerSituacao("<html>mudou tudo</html>").linhas.length, 0);   // layout novo: nada (o app esconde)
 });
