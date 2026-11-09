@@ -14,6 +14,17 @@
 
   document.getElementById("brandName").textContent = cfg.nome;
 
+  /* ---------- Sem internet ---------- */
+  // Sem conexão, a biblioteca do mapa (Leaflet, que vem da internet) não carrega e o app
+  // não tem como funcionar. Em vez de quebrar, mostra a tela "sem internet" e recarrega
+  // sozinho quando a conexão voltar.
+  if (typeof window.L === "undefined" || navigator.onLine === false) {
+    document.getElementById("semInternet").hidden = false;
+    document.getElementById("semInternetTentar").addEventListener("click", function () { location.reload(); });
+    window.addEventListener("online", function () { location.reload(); });
+    return;
+  }
+
   /* ---------- Tema ---------- */
   var COR_BARRA = { dark: "#0f0f14", light: "#F5F3FF" };
 
@@ -276,9 +287,44 @@
     return "A localização demorou demais. Toque no botão de localização para tentar de novo. (erro 3)";
   }
 
-  function falhaLocalizacao(err) {
-    mostrarAviso(mensagemFalhaLocalizacao(err), 10000);
+  /* ---------- Aviso de localização desligada ---------- */
+  // Cartão no meio da tela. Ao abrir o app, aparece uma vez por sessão: depois de
+  // "Continuar sem", só volta se a pessoa tocar no botão de localização do mapa.
+  var avisoLocal = document.getElementById("avisoLocal");
+
+  function localizacaoDispensada() {
+    try { return sessionStorage.getItem("busjp-sem-local") === "1"; } catch (e) { return false; }
   }
+
+  function fecharAvisoLocal(dispensar) {
+    avisoLocal.hidden = true;
+    if (dispensar) { try { sessionStorage.setItem("busjp-sem-local", "1"); } catch (e) {} }
+  }
+
+  function mostrarAvisoLocal(texto, pedidoDoUsuario) {
+    if (!pedidoDoUsuario && localizacaoDispensada()) return;
+    document.getElementById("avisoLocalComo").textContent = texto;
+    avisoLocal.hidden = false;
+    document.getElementById("avisoLocalAtivar").focus();
+  }
+
+  document.getElementById("avisoLocalAtivar").addEventListener("click", function () {
+    fecharAvisoLocal(false);
+    irParaMim(true);
+  });
+  document.getElementById("avisoLocalPular").addEventListener("click", function () { fecharAvisoLocal(true); });
+  avisoLocal.addEventListener("click", function (e) { if (e.target === avisoLocal) fecharAvisoLocal(true); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !avisoLocal.hidden) fecharAvisoLocal(true); });
+
+  function falhaLocalizacao(err, pedidoDoUsuario) {
+    mostrarAvisoLocal(mensagemFalhaLocalizacao(err).replace(/\s*\(erro \d\)$/, ""), pedidoDoUsuario);
+  }
+
+  // Avisos discretos se a internet cair ou voltar com o app aberto
+  window.addEventListener("offline", function () {
+    mostrarAviso("Você está sem internet. Os dados na tela podem ficar desatualizados.", 8000);
+  });
+  window.addEventListener("online", function () { mostrarAviso("Conexão de volta.", 3000); });
 
   // Tenta com GPS (mais preciso). Se demorar ou falhar por outro motivo que não seja
   // permissão, tenta de novo com precisão menor, que costuma funcionar em ambientes fechados.
@@ -296,7 +342,7 @@
   // Pede a localização e centraliza o mapa nela (ponto do usuário no centro da tela)
   function irParaMim(comAnimacao) {
     if (!("geolocation" in navigator)) {
-      mostrarAviso("Seu navegador não oferece localização.");
+      mostrarAvisoLocal("Este navegador não oferece localização. Tente outro navegador, como o Chrome ou o Safari.", comAnimacao);
       return;
     }
     // Se já sabemos onde a pessoa está, volta na hora e atualiza em seguida
@@ -310,7 +356,7 @@
       } else {
         mapa.setView(ll, cfg.mapa.zoomUsuario);
       }
-    }, falhaLocalizacao);
+    }, function (err) { falhaLocalizacao(err, comAnimacao); });
   }
 
   // Botão no mapa (direita, acima do zoom)

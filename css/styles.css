@@ -148,6 +148,37 @@ body { position: relative; overflow: hidden; }
   line-height: 1;
 }
 .controle-localizar svg { display: block; }
+/* Tela cheia "sem internet" e cartão de localização */
+.tela-cheia, .cartao-fundo {
+  position: fixed; inset: 0; display: grid; place-items: center;
+  padding: 24px max(16px, env(safe-area-inset-right)) 24px max(16px, env(safe-area-inset-left));
+}
+.tela-cheia { z-index: 3000; background: var(--bg-app); }
+.cartao-fundo { z-index: 2500; background: rgba(0, 0, 0, 0.5); }
+.tela-cheia[hidden], .cartao-fundo[hidden] { display: none; }
+.tela-cheia__conteudo { max-width: 340px; text-align: center; color: var(--texto-icone); }
+.cartao {
+  width: 100%; max-width: 330px; padding: 20px 18px 16px; text-align: center; color: var(--texto-icone);
+  background: var(--bg-caixa); border: 1px solid var(--borda-caixa); border-radius: 18px;
+  box-shadow: 0 12px 32px var(--sombra);
+}
+.ilustracao { display: block; margin: 0 auto; }
+.tela-cheia__conteudo h2, .cartao h2 { margin: 14px 0 8px; font-size: 1.25rem; }
+.tela-cheia__conteudo p, .cartao p { margin: 0 0 12px; color: var(--texto-suave); font-size: 0.95rem; line-height: 1.45; }
+.tela-cheia__nota { font-size: 0.82rem !important; }
+.cartao__dica {
+  padding: 8px 10px; border-radius: 10px; text-align: left; font-size: 0.8rem !important;
+  background: rgba(139, 92, 246, 0.12);
+}
+.cartao__dica:empty { display: none; }
+.cartao__botoes { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.botao-principal, .botao-secundario {
+  padding: 12px 22px; border-radius: 999px; font: inherit; font-weight: 700; cursor: pointer;
+}
+.botao-principal { border: 0; background: var(--cor-marca); color: #ffffff; }
+.botao-secundario { border: 1px solid var(--borda-caixa); background: transparent; color: var(--texto-icone); }
+.botao-principal:focus-visible, .botao-secundario:focus-visible { outline: 3px solid var(--cor-marca); outline-offset: 2px; }
+
 /* Ícone de estação de metrô/trem: trenzinho branco num círculo na cor da linha */
 .estacao-icone { background: transparent; border: 0; }
 .estacao-icone__circulo {

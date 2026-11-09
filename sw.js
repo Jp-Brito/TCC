@@ -1,8 +1,10 @@
 // Service worker mínimo: guarda a "casca" do app para abrir mais rápido.
 // Nunca guarda chamadas à API (/api) nem os blocos do mapa.
-const CACHE = "ovsp-casca-v1";
+// v2: guarda todos os scripts do app, para a tela "sem internet" aparecer mesmo offline.
+const CACHE = "ovsp-casca-v2";
 const CASCA = [
   "./", "index.html", "css/styles.css", "js/config.js", "js/app.js",
+  "js/paradas.js", "js/painel.js", "js/busca.js",
   "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png"
 ];
 

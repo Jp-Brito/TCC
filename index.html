@@ -114,6 +114,51 @@
     <footer id="painelRodape" class="painel__rodape"></footer>
   </section>
 
+  <!-- Tela "sem internet": cobre tudo quando o mapa não consegue carregar -->
+  <div id="semInternet" class="tela-cheia" role="alertdialog" aria-labelledby="semInternetTitulo" hidden>
+    <div class="tela-cheia__conteudo">
+      <svg class="ilustracao" viewBox="0 0 170 150" width="170" height="150" aria-hidden="true">
+        <circle cx="78" cy="82" r="64" style="fill:var(--cor-marca);opacity:.12"/>
+        <rect x="46" y="44" width="64" height="76" rx="13" style="fill:var(--cor-marca)"/>
+        <rect x="58" y="36" width="40" height="10" rx="4" style="fill:var(--cor-marca)"/>
+        <rect x="54" y="54" width="48" height="30" rx="6" fill="#ffffff" opacity=".92"/>
+        <circle cx="59" cy="100" r="5" fill="#FEF3C7"/><circle cx="97" cy="100" r="5" fill="#FEF3C7"/>
+        <rect x="68" y="97" width="20" height="6" rx="3" fill="#ffffff" opacity=".5"/>
+        <rect x="52" y="118" width="12" height="11" rx="3" fill="#1f2937"/><rect x="92" y="118" width="12" height="11" rx="3" fill="#1f2937"/>
+        <g transform="translate(108 10)">
+          <circle cx="26" cy="26" r="25" style="fill:var(--bg-caixa)" stroke="#F59E0B" stroke-width="3"/>
+          <g fill="none" stroke="#F59E0B" stroke-width="4" stroke-linecap="round">
+            <path d="M11 22 Q26 9 41 22"/><path d="M17 29 Q26 21 35 29"/><line x1="13" y1="12" x2="39" y2="40"/>
+          </g>
+          <circle cx="26" cy="36" r="3" fill="#F59E0B"/>
+        </g>
+      </svg>
+      <h2 id="semInternetTitulo">Sem conexão com a internet</h2>
+      <p>O app precisa de internet para mostrar o mapa e os ônibus em tempo real. Confira o Wi‑Fi ou os dados móveis.</p>
+      <p class="tela-cheia__nota">Quando a conexão voltar, o app abre sozinho.</p>
+      <button id="semInternetTentar" class="botao-principal" type="button">Tentar de novo</button>
+    </div>
+  </div>
+
+  <!-- Aviso de localização desligada: cartão no meio da tela, o app continua usável -->
+  <div id="avisoLocal" class="cartao-fundo" hidden>
+    <div class="cartao" role="dialog" aria-modal="true" aria-labelledby="avisoLocalTitulo">
+      <svg class="ilustracao" viewBox="0 0 120 110" width="110" height="100" aria-hidden="true">
+        <circle cx="60" cy="58" r="48" style="fill:var(--cor-marca);opacity:.12"/>
+        <ellipse cx="60" cy="94" rx="20" ry="6" style="fill:var(--cor-marca);opacity:.35"/>
+        <path d="M60 16C46 16 35 27 35 41c0 17 19 36 25 47 6-11 25-30 25-47 0-14-11-25-25-25Z" style="fill:var(--cor-marca)"/>
+        <text x="60" y="51" text-anchor="middle" font-size="26" font-weight="700" fill="#ffffff" font-family="system-ui, sans-serif">?</text>
+      </svg>
+      <h2 id="avisoLocalTitulo">Localização desligada</h2>
+      <p>Dá para usar o app sem ela, mas com a localização ligada mostramos as paradas perto de você e o caminho a pé até elas.</p>
+      <p id="avisoLocalComo" class="cartao__dica"></p>
+      <div class="cartao__botoes">
+        <button id="avisoLocalAtivar" class="botao-principal" type="button">Ativar localização</button>
+        <button id="avisoLocalPular" class="botao-secundario" type="button">Continuar sem</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="js/config.js"></script>
   <script src="js/paradas.js"></script>
