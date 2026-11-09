@@ -94,7 +94,60 @@
 
   // Ao tocar numa parada, abre o painel com as previsões de chegada
   function aoSelecionarParada(parada) {
-    Painel.abrir(parada);
+    var estacao = estacoesPorId.get(Number(parada.id));
+    if (estacao) Painel.abrirEstacao(estacao);   // estação de metrô/trem: programação, não Olho Vivo
+    else Painel.abrir(parada);
+  }
+
+  /* ---------- Estações de metrô e trem ---------- */
+  // O stops.txt da SPTrans mistura estações com pontos de ônibus. As estações (vindas de
+  // /api/trilhos) ganham ícone próprio e abrem o painel com a programação dos trens.
+  var estacoesPorId = new Map();   // id da parada -> { id, nome, lat, lon, linhas: [...] }
+  var dadosTrilhos = null;
+  var promessaTrilhos = null;
+
+  function carregarTrilhos() {
+    if (!promessaTrilhos) {
+      promessaTrilhos = fetch("api/trilhos")
+        .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+        .then(function (dados) {
+          dadosTrilhos = dados;
+          dados.linhas.forEach(function (linha) {
+            linha.estacoes.forEach(function (e) {
+              var id = Number(e.id), est = estacoesPorId.get(id);
+              if (!est) { est = { id: id, nome: e.nome, lat: e.lat, lon: e.lon, linhas: [] }; estacoesPorId.set(id, est); }
+              if (est.linhas.indexOf(linha) < 0) est.linhas.push(linha);
+            });
+          });
+          return dados;
+        })
+        .catch(function (erro) { promessaTrilhos = null; throw erro; });
+    }
+    return promessaTrilhos;
+  }
+
+  var TREM_SVG =
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#ffffff" stroke-width="2.2" ' +
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<rect x="5" y="3" width="14" height="14" rx="3"></rect><line x1="5" y1="11" x2="19" y2="11"></line>' +
+    '<line x1="8" y1="21" x2="10" y2="17"></line><line x1="16" y1="21" x2="14" y2="17"></line></svg>';
+
+  // Ícone da estação: trenzinho branco num círculo na cor da linha (cinza-escuro se tiver várias)
+  function iconeEstacao(estacao) {
+    var cor = estacao.linhas.length === 1 ? "#" + estacao.linhas[0].cor : "#374151";
+    return L.divIcon({
+      className: "estacao-icone",
+      html: '<span class="estacao-icone__circulo" style="background:' + cor + '">' + TREM_SVG + "</span>",
+      iconSize: [26, 26],
+      iconAnchor: [13, 13]
+    });
+  }
+
+  function marcadorEstacao(estacao, camada) {
+    return L.marker([estacao.lat, estacao.lon], {
+      icon: iconeEstacao(estacao), keyboard: false, zIndexOffset: 200, title: "Estação " + estacao.nome
+    }).on("click", function () { Painel.abrirEstacao(estacao); })
+      .addTo(camada);
   }
 
   function desenharParadas() {
@@ -117,6 +170,11 @@
     }
 
     lista.forEach(function (parada) {
+      var estacao = estacoesPorId.get(Number(parada.id));
+      if (estacao) {
+        if (!trilhosLigados) marcadorEstacao(estacao, camadaParadas);   // com o botão ligado, a camada de trilhos já desenha
+        return;
+      }
       L.circleMarker([parada.lat, parada.lon], {
         radius: 7,
         color: "#ffffff",
@@ -288,7 +346,6 @@
   mapa.createPane("trilhos").style.zIndex = 390;   // abaixo da camada padrão (400)
   var camadaTrilhos = L.layerGroup();
   var camadaEstacoes = L.layerGroup();
-  var dadosTrilhos = null;
   var trilhosLigados = false;
   var botaoTrilhos = null;
 
@@ -323,15 +380,8 @@
   function desenharEstacoes() {
     camadaEstacoes.clearLayers();
     if (!trilhosLigados || !dadosTrilhos || mapa.getZoom() < 13) return;
-    var raio = mapa.getZoom() >= 15 ? 5.5 : 4;
-    dadosTrilhos.linhas.forEach(function (linha) {
-      linha.estacoes.forEach(function (e) {
-        if (!Number.isFinite(e.lat) || !Number.isFinite(e.lon)) return;
-        L.circleMarker([e.lat, e.lon], {
-          pane: "trilhos", radius: raio, color: "#" + linha.cor, weight: 2.5, fillColor: "#ffffff", fillOpacity: 1
-        }).bindPopup(popupTexto("Estação " + e.nome, linha.nome), { className: "popup-tema" })
-          .addTo(camadaEstacoes);
-      });
+    estacoesPorId.forEach(function (estacao) {
+      if (Number.isFinite(estacao.lat) && Number.isFinite(estacao.lon)) marcadorEstacao(estacao, camadaEstacoes);
     });
   }
 
@@ -345,16 +395,15 @@
     if (!ligar) {
       mapa.removeLayer(camadaTrilhos);
       mapa.removeLayer(camadaEstacoes);
+      desenharParadas();   // as estações voltam para a camada de paradas
       return;
     }
     camadaTrilhos.addTo(mapa);
     camadaEstacoes.addTo(mapa);
-    if (dadosTrilhos) { desenharEstacoes(); return; }
-    fetch("api/trilhos")
-      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-      .then(function (dados) {
-        dadosTrilhos = dados;
+    carregarTrilhos()
+      .then(function () {
         if (trilhosLigados) desenharTrilhos();
+        desenharParadas();
       })
       .catch(function () {
         mostrarAviso("Não foi possível carregar as linhas de metrô e trem.");
@@ -390,6 +439,8 @@
   });
   new ControleTrilhos().addTo(mapa);
   try { if (localStorage.getItem("busjp-trilhos") === "1") ligarTrilhos(true); } catch (e) {}
+  // Mesmo com o botão desligado, carrega para saber quais pontos são estações
+  carregarTrilhos().then(desenharParadas).catch(function () { /* sem trilhos: estações ficam como pontos comuns */ });
 
   /* ---------- Instalar como aplicativo (PWA) ---------- */
   var btnInstalar = document.getElementById("btnInstalar");

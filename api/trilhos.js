@@ -1,5 +1,6 @@
 // GET /api/trilhos
-// Linhas de metrô e trem (CPTM) para desenhar no mapa: cor oficial, traçado e estações.
+// Linhas de metrô e trem (CPTM) para desenhar no mapa: cor oficial, traçado, estações e a
+// programação de cada sentido (intervalo entre trens por faixa de horário, do frequencies.txt).
 // Tudo vem do GTFS da SPTrans (routes.txt, trips.txt, stop_times.txt) e dos arquivos já
 // gerados (tracados.json e stops.json). São dados fixos (sem posição dos trens em tempo
 // real, que o Metrô e a CPTM não publicam), por isso a resposta pode ficar em cache.
@@ -19,18 +20,46 @@ const NOMES = {
 
 let resposta = null;   // montada uma vez por instância da função
 
+// "PALMEIRAS - BARRA FUNDA" -> "Palmeiras - Barra Funda"
+function titulo(texto) {
+  return String(texto ?? "").toLowerCase().replace(/(^|[\s(-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase())
+    .replace(/ (De|Da|Do|Das|Dos|E) /g, (m) => m.toLowerCase());
+}
+
 function montar() {
   // Só as linhas do GTFS que interessam (os arquivos têm milhares de linhas de ônibus)
   const filtrar = (texto) => texto.split(/\r?\n/).filter((l, i) => i === 0 || /^"?(METRÔ|CPTM)/.test(l)).join("\n");
   const rotas = lerCsv(filtrar(arquivo("gtfs/routes.txt")));
   const viagens = lerCsv(filtrar(arquivo("gtfs/trips.txt")));
   const horarios = lerCsv(filtrar(arquivo("gtfs/stop_times.txt")));
+  const frequencias = lerCsv(filtrar(arquivo("gtfs/frequencies.txt")));
   const tracados = JSON.parse(arquivo("tracados.json"));
   const paradas = JSON.parse(arquivo("stops.json"));
   const col = (cab) => Object.fromEntries(cab.map((n, i) => [n.trim(), i]));
 
   const indice = new Map(paradas.ids.map((id, i) => [String(id), i]));
-  const cr = col(rotas[0]), cv = col(viagens[0]), ch = col(horarios[0]);
+  const cr = col(rotas[0]), cv = col(viagens[0]), ch = col(horarios[0]), cf = col(frequencias[0]);
+  const minutos = (hhmmss) => { const [h, m] = hhmmss.split(":").map(Number); return h * 60 + m; };
+
+  // Faixas de horário de cada viagem: [início (min), fim (min), intervalo (s)]
+  const faixasDe = new Map();
+  for (const f of frequencias.slice(1)) {
+    const lista = faixasDe.get(f[cf.trip_id]) ?? [];
+    lista.push([minutos(f[cf.start_time]), minutos(f[cf.end_time]), Number(f[cf.headway_secs])]);
+    faixasDe.set(f[cf.trip_id], lista);
+  }
+  // Sentidos de cada linha: destino (trip_headsign) e faixas
+  const sentidosDe = new Map();
+  for (const v of viagens.slice(1)) {
+    const lista = sentidosDe.get(v[cv.route_id]) ?? [];
+    if (lista.some((s) => s.direcao === Number(v[cv.direction_id]))) continue;
+    lista.push({
+      direcao: Number(v[cv.direction_id]),
+      destino: titulo(v[cv.trip_headsign]),
+      faixas: (faixasDe.get(v[cv.trip_id]) ?? []).sort((a, b) => a[0] - b[0])
+    });
+    sentidosDe.set(v[cv.route_id], lista);
+  }
 
   // Viagem da direção 0 de cada linha (as duas direções passam pelos mesmos trilhos)
   const viagemDe = new Map();
@@ -66,6 +95,7 @@ function montar() {
       trecho: r[cr.route_long_name],
       cor: /^[0-9A-F]{6}$/i.test(r[cr.route_color]) ? r[cr.route_color] : "8B5CF6",
       polilinha: forma ? tracados.formas[forma] ?? null : null,
+      sentidos: (sentidosDe.get(id) ?? []).sort((a, b) => a.direcao - b.direcao),
       estacoes
     });
   }

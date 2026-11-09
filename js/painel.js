@@ -36,6 +36,7 @@
     horaReferencia: null,
     erro: null,
     modoLinha: null,       // linha aberta pela busca (sem parada): { codigo, letreiro, cor, ... }
+    estacao: null,         // estação de metrô/trem aberta: { id, nome, lat, lon, linhas: [...] }
     minimizado: false,     // painel recolhido (só o cabeçalho), para ver mais do mapa
     carregando: false,
     ajustarMapa: false,    // true = na próxima atualização, enquadrar parada + ônibus
@@ -160,7 +161,7 @@
 
   // Há algo aberto no painel: uma parada ou uma linha vinda da busca
   function ativo() {
-    return estado.parada !== null || estado.modoLinha !== null;
+    return estado.parada !== null || estado.modoLinha !== null || estado.estacao !== null;
   }
 
   /* ---------- Desenho do painel ---------- */
@@ -232,7 +233,116 @@
     medirAltura();
   }
 
+  /* ---------- Estação de metrô ou trem (programação, sem tempo real) ---------- */
+
+  // Hora atual em São Paulo, em minutos desde a meia-noite
+  function minutoAgoraSP() {
+    var hhmm = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .format(new Date());
+    return paraMinutos(hhmm);
+  }
+
+  function textoIntervalo(segundos) {
+    return "a cada " + Math.max(1, Math.round(segundos / 60)) + " min";
+  }
+
+  function textoHora(minutos) {
+    var h = Math.floor(minutos / 60) % 24, m = minutos % 60;
+    return h + "h" + (m ? String(m).padStart(2, "0") : "");
+  }
+
+  // Faixa em vigor agora e a próxima mudança de intervalo. faixas: [[início, fim, segundos], ...]
+  function situacaoSentido(faixas, agora) {
+    var atual = null, proxima = null, i;
+    for (i = 0; i < faixas.length; i++) {
+      if (agora >= faixas[i][0] && agora <= faixas[i][1]) { atual = faixas[i]; break; }
+    }
+    // próxima faixa com intervalo diferente do atual (ou, se fechado, a próxima abertura)
+    for (i = 0; i < faixas.length; i++) {
+      if (faixas[i][0] > agora && (!atual || faixas[i][2] !== atual[2])) { proxima = faixas[i]; break; }
+    }
+    if (!atual && !proxima && faixas.length) proxima = faixas[0];   // abre de novo no dia seguinte
+    return { atual: atual, proxima: proxima };
+  }
+
+  function renderizarEstacao() {
+    var est = estado.estacao, agora = minutoAgoraSP();
+    els.titulo.textContent = "Estação " + est.nome;
+    els.sub.textContent = est.linhas.map(function (l) { return l.nome; }).join(" · ");
+    els.corpo.textContent = "";
+    var resumo = "";
+
+    est.linhas.forEach(function (linha) {
+      linha.sentidos.forEach(function (s) {
+        var sit = situacaoSentido(s.faixas, agora);
+        var item = el("div", "linha linha--estacao");
+        var etiqueta = el("span", "linha__letreiro", "L" + linha.numero);
+        var cor = corDaLinha(linha.cor);
+        etiqueta.style.background = "#" + cor.fundo;
+        etiqueta.style.color = "#" + cor.texto;
+        item.appendChild(etiqueta);
+
+        var meio = el("span", "linha__meio");
+        meio.appendChild(el("span", "linha__destino", "→ " + s.destino));
+        if (sit.proxima) {
+          meio.appendChild(el("span", "linha__depois",
+            "a partir das " + textoHora(sit.proxima[0]) + ": " + textoIntervalo(sit.proxima[2])));
+        }
+        item.appendChild(meio);
+
+        var tempo = el("span", "linha__tempo");
+        tempo.appendChild(el("strong", "", sit.atual ? textoIntervalo(sit.atual[2]) : "fechado"));
+        tempo.appendChild(el("small", "", "programado"));
+        item.appendChild(tempo);
+        els.corpo.appendChild(item);
+        if (!resumo) resumo = "L" + linha.numero + " · " + (sit.atual ? textoIntervalo(sit.atual[2]) : "fora do horário") + " (programado)";
+      });
+      if (linha.sentidos.length && linha.sentidos[0].faixas.length) {
+        var f = linha.sentidos[0].faixas;
+        els.corpo.appendChild(el("p", "estacao__info", "Linha " + linha.numero + ": funcionamento programado das " +
+          textoHora(f[0][0]) + " às " + textoHora(f[f.length - 1][1] + 1) + "."));
+      }
+    });
+
+    els.rodape.textContent = "Horários programados (GTFS da SPTrans). O Metrô e a CPTM não publicam a posição dos trens em tempo real.";
+    els.resumo.textContent = resumo || "Programação indisponível";
+    medirAltura();
+  }
+
+  function abrirEstacao(est) {
+    if (estado.controlador) estado.controlador.abort();
+    clearTimeout(estado.timer);
+    estado.parada = null;
+    estado.modoLinha = null;
+    estado.estacao = est;
+    estado.linhas = [];
+    estado.codigoSelecionado = null;
+    estado.erro = null;
+    estado.carregando = false;
+    estado.infoParadas = null;
+    estado.infoTracado = null;
+
+    limparOnibus();
+    historico = {};
+    camadaSelecao.clearLayers();
+    camadaParadasLinha.clearLayers();
+    paradasLinhaAtual = null;
+    paradasDesenhadasDe = null;
+    camadaTracado.clearLayers();
+    tracadoDesenhadoDe = null;
+    L.circleMarker([est.lat, est.lon], {
+      radius: 17, color: "#8B5CF6", weight: 3, fill: false, interactive: false
+    }).addTo(camadaSelecao);
+
+    els.painel.classList.add("aberto");
+    minimizar(false);
+    avisarMudanca();
+    mostrarCaminho(est, false);
+    renderizar();
+  }
+
   function renderizar() {
+    if (estado.estacao) { renderizarEstacao(); return; }
     if (estado.modoLinha) { renderizarLinha(); return; }
     els.titulo.textContent = estado.parada.nome;
     els.sub.textContent = "Parada " + estado.parada.id +
@@ -705,6 +815,7 @@
         distanciaM({ lat: caminho.origem[0], lon: caminho.origem[1] }, { lat: ll[0], lon: ll[1] }) < 50) return;
     if (estado.modoLinha) { caminho.alvo = null; caminhoParaLinha(); }
     else if (estado.parada) mostrarCaminho(estado.parada, false);
+    else if (estado.estacao) mostrarCaminho(estado.estacao, false);
   }
 
   /* ---------- Traçado da linha ---------- */
@@ -1125,6 +1236,7 @@
     clearTimeout(estado.timer);
 
     estado.parada = null;
+    estado.estacao = null;
     estado.modoLinha = item;
     estado.linhas = [{ codigo: item.codigo, letreiro: item.letreiro, destino: null,
                        sentido: item.sentido, cor: item.cor, veiculos: [] }];
@@ -1169,6 +1281,7 @@
     clearTimeout(estado.timer);
 
     estado.modoLinha = null;
+    estado.estacao = null;
     estado.parada = parada;
     estado.linhas = [];
     estado.codigoSelecionado = linhaPreferida || null;
@@ -1207,6 +1320,7 @@
     clearTimeout(estado.timer);
     estado.parada = null;
     estado.modoLinha = null;
+    estado.estacao = null;
     estado.infoParadas = null;
     estado.infoTracado = null;
     limparOnibus();
@@ -1297,12 +1411,13 @@
     fechar: fechar,
     estaAberto: estaAberto,
     definirPosicaoUsuario: definirPosicaoUsuario,
+    abrirEstacao: abrirEstacao,
     decodificarPolilinha: decodificarPolilinha,
     _teste: {
       paraMinutos: paraMinutos, minutosAte: minutosAte, textoTempo: textoTempo,
       processar: processar, decodificarPolilinha: decodificarPolilinha, rumoNoTracado: rumoNoTracado, distanciaM: distanciaM, rumoEntre: rumoEntre, textoIdade: textoIdade,
       diferencaAngular: diferencaAngular, manterAusentes: manterAusentes, raioParadaLinha: raioParadaLinha, textoCaminho: textoCaminho,
-      trechoNoTracado: trechoNoTracado
+      trechoNoTracado: trechoNoTracado, situacaoSentido: situacaoSentido, textoHora: textoHora
     }
   };
 })();

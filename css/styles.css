@@ -148,6 +148,15 @@ body { position: relative; overflow: hidden; }
   line-height: 1;
 }
 .controle-localizar svg { display: block; }
+/* Ícone de estação de metrô/trem: trenzinho branco num círculo na cor da linha */
+.estacao-icone { background: transparent; border: 0; }
+.estacao-icone__circulo {
+  display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  border: 2px solid #ffffff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55); cursor: pointer;
+}
+.linha--estacao { cursor: default; }
+.estacao__info { margin: 2px 4px 10px; font-size: 0.78rem; color: var(--texto-suave); }
+
 /* Botão das linhas de metrô e trem: roxo quando ligado */
 .controle-trilhos a.ativo, .controle-trilhos a.ativo:hover { background: var(--cor-marca); color: #ffffff; }
 

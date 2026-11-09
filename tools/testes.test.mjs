@@ -181,3 +181,23 @@ caso("trilhos: linhas de metrô e trem com cor, traçado e estações", () => {
   assert.ok(azul.polilinha && azul.estacoes.length > 15);
   assert.ok(linhas.every((l) => /^[0-9A-F]{6}$/i.test(l.cor)));
 });
+
+caso("estação: intervalo programado agora e a próxima mudança", () => {
+  const faixas = [[240, 299, 480], [300, 359, 240], [360, 419, 240], [420, 479, 420]];   // 4h a 7h59
+  const s1 = simples(P.situacaoSentido(faixas, 310));     // 5h10
+  assert.deepEqual(s1.atual, [300, 359, 240]);
+  assert.deepEqual(s1.proxima, [420, 479, 420]);           // pula a faixa com o mesmo intervalo
+  const fechado = simples(P.situacaoSentido(faixas, 100)); // 1h40: fechado, abre às 4h
+  assert.equal(fechado.atual, null);
+  assert.deepEqual(fechado.proxima, [240, 299, 480]);
+  assert.equal(P.textoHora(1440), "0h");
+});
+
+caso("trilhos: cada linha traz os dois sentidos com a programação", () => {
+  const res = respostaFalsa();
+  trilhos({ method: "GET" }, res);
+  const l9 = res.corpo.linhas.find((l) => l.id === "CPTM L09");
+  assert.equal(l9.sentidos.length, 2);
+  assert.ok(l9.sentidos.every((s) => s.faixas.length > 10 && s.destino));
+  assert.ok(l9.estacoes.some((e) => e.nome === "Ceasa"));
+});
