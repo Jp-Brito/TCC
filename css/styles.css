@@ -428,10 +428,7 @@ body.painel-aberto .leaflet-bottom { bottom: var(--altura-painel); }
 .favoritos__remover { flex: 0 0 auto; box-shadow: none; color: var(--texto-suave); }
 .painel__favorito.ativo { color: #F59E0B; }
 .painel__favorito.ativo svg { fill: #F59E0B; }
-.painel__favorito[hidden], .painel__acessivel[hidden] { display: none; }
-/* Botão ♿ do painel: roxo quando o filtro está ligado */
-.painel__acessivel { font-size: 1.05rem; line-height: 1; }
-.painel__acessivel.ativo { background: var(--cor-marca); color: #ffffff; border-color: var(--cor-marca); }
+.painel__favorito[hidden] { display: none; }
 
 /* Painel no modo linha: lista de ônibus */
 .onibus-item {
