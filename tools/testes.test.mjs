@@ -11,6 +11,7 @@ import * as gtfs from "../lib/gtfs.js";
 import linhas from "../api/linhas.js";
 import previsao from "../api/previsao.js";
 import rotaAPe from "../api/rota-a-pe.js";
+import trilhos from "../api/trilhos.js";
 
 process.env.OLHOVIVO_TOKEN = "token-de-teste";   // só para os testes; a Olho Vivo é simulada
 
@@ -167,4 +168,16 @@ caso("rota a pé: converte a resposta da OpenRouteService (lon,lat -> lat,lon)",
   delete process.env.ORS_KEY;
   assert.equal(res.codigo, 200);
   assert.deepEqual(res.corpo, { distanciaM: 396, duracaoS: 285, pontos: [[-23.5505, -46.6333], [-23.552, -46.635]] });
+});
+
+caso("trilhos: linhas de metrô e trem com cor, traçado e estações", () => {
+  const res = respostaFalsa();
+  trilhos({ method: "GET" }, res);
+  assert.equal(res.codigo, 200);
+  const linhas = res.corpo.linhas;
+  assert.ok(linhas.length >= 15, "metrô e CPTM");
+  const azul = linhas.find((l) => l.id === "METRÔ L1");
+  assert.equal(azul.nome, "Metrô · Linha 1 – Azul");
+  assert.ok(azul.polilinha && azul.estacoes.length > 15);
+  assert.ok(linhas.every((l) => /^[0-9A-F]{6}$/i.test(l.cor)));
 });

@@ -281,6 +281,116 @@
   });
   new ControleLocalizar().addTo(mapa);
 
+  /* ---------- Linhas de metrô e trem (liga/desliga) ---------- */
+  // Desenho fixo das linhas sobre trilhos (cor oficial, traçado e estações), vindo de
+  // /api/trilhos (GTFS da SPTrans). Fica por baixo dos traçados de ônibus. Não há posição
+  // dos trens em tempo real: o Metrô e a CPTM não publicam esse dado.
+  mapa.createPane("trilhos").style.zIndex = 390;   // abaixo da camada padrão (400)
+  var camadaTrilhos = L.layerGroup();
+  var camadaEstacoes = L.layerGroup();
+  var dadosTrilhos = null;
+  var trilhosLigados = false;
+  var botaoTrilhos = null;
+
+  function popupTexto(titulo, linhaTexto) {
+    var raiz = document.createElement("div");
+    var forte = document.createElement("strong");
+    forte.textContent = titulo;
+    raiz.appendChild(forte);
+    if (linhaTexto) {
+      var sub = document.createElement("div");
+      sub.textContent = linhaTexto;
+      raiz.appendChild(sub);
+    }
+    return raiz;
+  }
+
+  function desenharTrilhos() {
+    camadaTrilhos.clearLayers();
+    dadosTrilhos.linhas.forEach(function (linha) {
+      if (!linha.polilinha) return;
+      var pontos = Painel.decodificarPolilinha(linha.polilinha);
+      L.polyline(pontos, { pane: "trilhos", color: "#ffffff", weight: 8, opacity: 0.35, interactive: false })
+        .addTo(camadaTrilhos);
+      L.polyline(pontos, { pane: "trilhos", color: "#" + linha.cor, weight: 5, opacity: 0.9 })
+        .bindPopup(popupTexto(linha.nome, linha.trecho), { className: "popup-tema" })
+        .addTo(camadaTrilhos);
+    });
+    desenharEstacoes();
+  }
+
+  // Estações a partir do zoom 13, maiores de perto
+  function desenharEstacoes() {
+    camadaEstacoes.clearLayers();
+    if (!trilhosLigados || !dadosTrilhos || mapa.getZoom() < 13) return;
+    var raio = mapa.getZoom() >= 15 ? 5.5 : 4;
+    dadosTrilhos.linhas.forEach(function (linha) {
+      linha.estacoes.forEach(function (e) {
+        if (!Number.isFinite(e.lat) || !Number.isFinite(e.lon)) return;
+        L.circleMarker([e.lat, e.lon], {
+          pane: "trilhos", radius: raio, color: "#" + linha.cor, weight: 2.5, fillColor: "#ffffff", fillOpacity: 1
+        }).bindPopup(popupTexto("Estação " + e.nome, linha.nome), { className: "popup-tema" })
+          .addTo(camadaEstacoes);
+      });
+    });
+  }
+
+  function ligarTrilhos(ligar) {
+    trilhosLigados = ligar;
+    try { localStorage.setItem("busjp-trilhos", ligar ? "1" : "0"); } catch (e) {}
+    if (botaoTrilhos) {
+      botaoTrilhos.classList.toggle("ativo", ligar);
+      botaoTrilhos.setAttribute("aria-pressed", ligar ? "true" : "false");
+    }
+    if (!ligar) {
+      mapa.removeLayer(camadaTrilhos);
+      mapa.removeLayer(camadaEstacoes);
+      return;
+    }
+    camadaTrilhos.addTo(mapa);
+    camadaEstacoes.addTo(mapa);
+    if (dadosTrilhos) { desenharEstacoes(); return; }
+    fetch("api/trilhos")
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (dados) {
+        dadosTrilhos = dados;
+        if (trilhosLigados) desenharTrilhos();
+      })
+      .catch(function () {
+        mostrarAviso("Não foi possível carregar as linhas de metrô e trem.");
+        ligarTrilhos(false);
+      });
+  }
+
+  mapa.on("zoomend", desenharEstacoes);
+
+  var ControleTrilhos = L.Control.extend({
+    options: { position: "bottomright" },
+    onAdd: function () {
+      var caixa = L.DomUtil.create("div", "leaflet-bar leaflet-control controle-localizar controle-trilhos");
+      botaoTrilhos = L.DomUtil.create("a", "", caixa);
+      botaoTrilhos.href = "#";
+      botaoTrilhos.setAttribute("role", "button");
+      botaoTrilhos.setAttribute("aria-pressed", "false");
+      botaoTrilhos.setAttribute("title", "Mostrar linhas de metrô e trem");
+      botaoTrilhos.setAttribute("aria-label", "Mostrar linhas de metrô e trem");
+      botaoTrilhos.innerHTML =
+        '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" ' +
+        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<rect x="5" y="3" width="14" height="14" rx="3"></rect><line x1="5" y1="11" x2="19" y2="11"></line>' +
+        '<circle cx="9" cy="14" r="0.8"></circle><circle cx="15" cy="14" r="0.8"></circle>' +
+        '<line x1="8" y1="21" x2="10" y2="17"></line><line x1="16" y1="21" x2="14" y2="17"></line></svg>';
+      L.DomEvent.disableClickPropagation(caixa);
+      L.DomEvent.on(botaoTrilhos, "click", function (e) {
+        L.DomEvent.preventDefault(e);
+        ligarTrilhos(!trilhosLigados);
+      });
+      return caixa;
+    }
+  });
+  new ControleTrilhos().addTo(mapa);
+  try { if (localStorage.getItem("busjp-trilhos") === "1") ligarTrilhos(true); } catch (e) {}
+
   /* ---------- Instalar como aplicativo (PWA) ---------- */
   var btnInstalar = document.getElementById("btnInstalar");
   var eventoInstalacao = null;

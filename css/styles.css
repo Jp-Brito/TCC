@@ -148,6 +148,8 @@ body { position: relative; overflow: hidden; }
   line-height: 1;
 }
 .controle-localizar svg { display: block; }
+/* Botão das linhas de metrô e trem: roxo quando ligado */
+.controle-trilhos a.ativo, .controle-trilhos a.ativo:hover { background: var(--cor-marca); color: #ffffff; }
 
 /* Créditos do mapa: recolhidos num pequeno "i" (toque para abrir) */
 .leaflet-control-attribution {

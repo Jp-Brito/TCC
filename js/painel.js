@@ -1297,6 +1297,7 @@
     fechar: fechar,
     estaAberto: estaAberto,
     definirPosicaoUsuario: definirPosicaoUsuario,
+    decodificarPolilinha: decodificarPolilinha,
     _teste: {
       paraMinutos: paraMinutos, minutosAte: minutosAte, textoTempo: textoTempo,
       processar: processar, decodificarPolilinha: decodificarPolilinha, rumoNoTracado: rumoNoTracado, distanciaM: distanciaM, rumoEntre: rumoEntre, textoIdade: textoIdade,
