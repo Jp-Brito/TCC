@@ -67,7 +67,7 @@ if (args.includes("--resumo")) {
 }
 
 /* ---------- configuração da coleta ---------- */
-const base = opcao("url", "https://olhovivobus.vercel.app").replace(/\/$/, "");
+const base = opcao("url", "https://jotabus.vercel.app").replace(/\/$/, "");
 const duracaoMin = Number(opcao("duracao", 60));
 const intervaloS = Number(opcao("intervalo", 15));
 const raio = Number(opcao("raio", 50));

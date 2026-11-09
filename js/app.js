@@ -12,7 +12,7 @@
     caixa.hidden = false;
   });
 
-  document.getElementById("brandName").textContent = cfg.nome;
+  // O nome no topo fica no index.html ("Jota" e "Bus" em cores diferentes)
 
   /* ---------- Sem internet ---------- */
   // Sem conexão, a biblioteca do mapa (Leaflet, que vem da internet) não carrega e o app

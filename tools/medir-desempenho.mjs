@@ -2,7 +2,7 @@
 // e guarda cada medição num arquivo CSV para análise e para o TCC.
 //
 // Uso (na pasta do projeto):
-//   node tools/medir-desempenho.mjs [--url https://olhovivobus.vercel.app] [--rodadas 20]
+//   node tools/medir-desempenho.mjs [--url https://jotabus.vercel.app] [--rodadas 20]
 //                                   [--intervalo 2000] [--condicao wifi]
 //   node tools/medir-desempenho.mjs --resumo        (resume o CSV por endpoint, horário e condição)
 //
@@ -70,7 +70,7 @@ if (args.includes("--resumo")) {
 }
 
 /* ---------- modo medição ---------- */
-const base = opcao("url", "https://olhovivobus.vercel.app").replace(/\/$/, "");
+const base = opcao("url", "https://jotabus.vercel.app").replace(/\/$/, "");
 const rodadas = Number(opcao("rodadas", 20));
 const intervalo = Number(opcao("intervalo", 2000));
 const condicao = opcao("condicao", "nao-informada");

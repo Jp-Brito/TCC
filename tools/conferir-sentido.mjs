@@ -9,7 +9,7 @@
 //       node tools/conferir-sentido.mjs --base http://localhost:3000
 const args = process.argv.slice(2);
 const opcao = (nome, padrao) => { const i = args.indexOf("--" + nome); return i >= 0 ? args[i + 1] : padrao; };
-const BASE = opcao("base", "https://olhovivobus.vercel.app");
+const BASE = opcao("base", "https://jotabus.vercel.app");
 const TERMOS = opcao("termos", "5119,8000,875A,675K,N842,6450,917H,477P,701U,2290,509M,148L").split(",");
 const ESPERA_S = Number(opcao("espera", "45"));
 

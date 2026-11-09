@@ -5,7 +5,7 @@ de São Paulo em tempo real. Site em HTML e JavaScript puro com mapa Leaflet, in
 aplicativo (PWA), e funções Node.js na Vercel (região `gru1`, São Paulo) que consultam a API
 Olho Vivo da SPTrans. O site e as funções ficam no mesmo projeto.
 
-Publicado em: https://olhovivobus.vercel.app
+Publicado em: https://jotabus.vercel.app (o endereço antigo olhovivobus.vercel.app continua funcionando)
 
 ## Funcionalidades
 - Mapa claro/escuro, localização do usuário e paradas (a partir do zoom 15)

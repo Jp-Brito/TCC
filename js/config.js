@@ -1,5 +1,5 @@
 // Configurações centrais do projeto (nome provisório e mapa).
-// Para trocar o nome, basta alterar aqui e no <title> do index.html.
+// Nome do app: aqui, no <title> e no topo do index.html, e no manifest.webmanifest.
 window.APP_CONFIG = {
   nome: "JotaBus",
   sigla: "JotaBus",

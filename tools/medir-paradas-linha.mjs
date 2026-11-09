@@ -2,7 +2,7 @@
 // plano B (previsão da linha) ajuda. Responde à pergunta: "quão grave é a limitação?".
 //
 // Uso (na pasta do projeto):
-//   node tools/medir-paradas-linha.mjs [--url https://olhovivobus.vercel.app] [--amostra 80]
+//   node tools/medir-paradas-linha.mjs [--url https://jotabus.vercel.app] [--amostra 80]
 //                                      [--semente 1] [--pausa 150] [--rotulo dia]
 //
 // Sorteia números de linha do data/gtfs/routes.txt (com semente fixa, para dar para repetir),
@@ -17,7 +17,7 @@ import { lerCsv } from "../lib/csv.js";
 
 const args = process.argv.slice(2);
 const opcao = (nome, padrao) => { const i = args.indexOf("--" + nome); return i >= 0 ? args[i + 1] : padrao; };
-const base = opcao("url", "https://olhovivobus.vercel.app").replace(/\/$/, "");
+const base = opcao("url", "https://jotabus.vercel.app").replace(/\/$/, "");
 const amostra = Number(opcao("amostra", 80));
 const semente = Number(opcao("semente", 1));
 const pausa = Number(opcao("pausa", 150));

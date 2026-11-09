@@ -54,7 +54,7 @@ export default async function handler(req, res) {
   if (!exigirGet(req, res)) return;
   try {
     const resposta = await fetch(ORIGEM, {
-      headers: { Accept: "application/json", "User-Agent": "OnibusAoVivoSP/0.1 (prototipo de TCC; olhovivobus.vercel.app)" },
+      headers: { Accept: "application/json", "User-Agent": "JotaBus/0.1 (prototipo de TCC; jotabus.vercel.app)" },
       signal: AbortSignal.timeout(TEMPO_LIMITE_MS)
     });
     if (!resposta.ok) {
