@@ -1,4 +1,4 @@
-// Ônibus ao Vivo SP — cabeçalho, tema claro/escuro, mapa e localização do usuário.
+// JotaBus — cabeçalho, tema claro/escuro, mapa e localização do usuário.
 (function () {
   "use strict";
   var cfg = window.APP_CONFIG;

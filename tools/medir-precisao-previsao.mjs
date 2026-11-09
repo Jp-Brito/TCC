@@ -11,7 +11,9 @@
 //     erro negativo = o ônibus demorou mais do que o previsto.
 //
 // Uso (na pasta do projeto, com o computador ligado durante toda a coleta):
-//   node tools/medir-precisao-previsao.mjs --termo 5119 [--duracao 60] [--rotulo tarde]
+//   node tools/medir-precisao-previsao.mjs --termo 5119 [--sentido 2] [--duracao 60] [--rotulo tarde]
+//       (sem --parada, escolhe 3 paradas do sentido: no começo, no meio e no fim da linha)
+//   node tools/medir-precisao-previsao.mjs --linha 32769 --letreiro 5119-10 --parada 5507020,550015969,850011318
 //   node tools/medir-precisao-previsao.mjs --linha 3587 --letreiro 5119-10 --parada 480014614 [--duracao 60]
 //   node tools/medir-precisao-previsao.mjs --linha 3587 --parada 480014614 --duracao 0
 //   node tools/medir-precisao-previsao.mjs --resumo      (junta todas as coletas guardadas)
@@ -55,11 +57,12 @@ function resumir(linhas) {   // linhas: [{antecedenciaMin, erroMin}]
 if (args.includes("--resumo")) {
   if (!existsSync(ARQUIVO)) { console.error("Ainda não há dados em " + ARQUIVO); process.exit(1); }
   const [, ...l] = readFileSync(ARQUIVO, "utf8").trim().split("\n");
-  const dados = l.map((x) => { const c = x.split(","); return { rotulo: c[0], antecedenciaMin: Number(c[5]), erroMin: Number(c[8]), prefixo: c[3], linha: c[2] }; });
+  const dados = l.map((x) => { const c = x.split(","); return { rotulo: c[0], parada: c[1], antecedenciaMin: Number(c[5]), erroMin: Number(c[8]), prefixo: c[3], linha: c[2] }; });
   console.log(`\n${dados.length} comparações (previsão x chegada real) em ${ARQUIVO}`);
   console.log(`ônibus distintos: ${new Set(dados.map((d) => d.linha + "/" + d.prefixo)).size}\n`);
   console.log("== Todas as coletas =="); resumir(dados);
   for (const r of [...new Set(dados.map((d) => d.rotulo))]) { console.log(`\n== Rótulo: ${r} ==`); resumir(dados.filter((d) => d.rotulo === r)); }
+  for (const p of [...new Set(dados.map((d) => d.parada))]) { console.log(`\n== Parada: ${p} ==`); resumir(dados.filter((d) => d.parada === p)); }
   process.exit(0);
 }
 
@@ -119,85 +122,108 @@ function passagem(trilha, parada) {
   return dmin <= raio ? { ts: a.ts + u * (b.ts - a.ts), dmin } : null;
 }
 
-/* ---------- descoberta da linha e da parada ---------- */
+/* ---------- descoberta da linha e das paradas ---------- */
 let linhaCodigo = opcao("linha", null);
-let paradaId = opcao("parada", null);
 let letreiro = opcao("letreiro", "");
+let sentido = Number(opcao("sentido", 0)) || null;
+let paradaIds = (opcao("parada", "") || "").split(",").map((x) => x.trim()).filter(Boolean);
 if (!linhaCodigo) {
   const termo = opcao("termo", null);
-  if (!termo) { console.error("Informe --termo (ex.: 5119) ou --linha CODIGO --parada ID."); process.exit(1); }
+  if (!termo) { console.error("Informe --termo (ex.: 5119) ou --linha CODIGO --parada ID[,ID,...]."); process.exit(1); }
   const busca = await chamar("/api/linhas?termo=" + encodeURIComponent(termo));
-  const l = busca?.corpo?.linhas?.[0];
+  const opcoes = busca?.corpo?.linhas ?? [];
+  const l = opcoes.find((x) => !sentido || x.sentido === sentido) ?? opcoes[0];
   if (!l) { console.error("Linha não encontrada para o termo " + termo); process.exit(1); }
-  linhaCodigo = String(l.codigo); letreiro = l.letreiro;
+  linhaCodigo = String(l.codigo); letreiro = l.letreiro; sentido = l.sentido;
+} else if (letreiro && !sentido) {
+  // descobre o sentido do código informado (as paradas do GTFS dependem dele)
+  const busca = await chamar("/api/linhas?termo=" + encodeURIComponent(letreiro.split("-")[0]));
+  sentido = (busca?.corpo?.linhas ?? []).find((x) => String(x.codigo) === String(linhaCodigo))?.sentido ?? null;
 }
-if (!paradaId) {
+if (!paradaIds.length) {
+  // 3 paradas do sentido: a 25%, 50% e 75% do trajeto
   const params = new URLSearchParams({ linha: linhaCodigo });
   if (letreiro) params.set("letreiro", letreiro);
+  if (sentido) params.set("sentido", String(sentido));
   const p = await chamar("/api/paradas-linha?" + params);
   const lista = p?.corpo?.paradas ?? [];
   if (!lista.length) { console.error("A API não devolveu paradas para a linha " + linhaCodigo + ". Informe --parada ID."); process.exit(1); }
-  paradaId = String(lista[Math.floor(lista.length / 2)].id);
+  const escolhidas = lista.length < 3 ? lista : [0.25, 0.5, 0.75].map((f) => lista[Math.floor((lista.length - 1) * f)]);
+  paradaIds = [...new Set(escolhidas.map((x) => String(x.id)))];
 }
 
 mkdirSync(dirname(ARQUIVO), { recursive: true });
 if (!existsSync(ARQUIVO)) appendFileSync(ARQUIVO, CABECALHO);
 
 const descricaoDuracao = duracaoMin === 0 ? "contínua" : `${duracaoMin} min`;
-console.log(`Medindo ${base}\nlinha ${letreiro || ""} (código ${linhaCodigo}) | parada ${paradaId} | ${descricaoDuracao} | ciclo de ${intervaloS} s | raio ${raio} m | rótulo: ${rotulo}`);
+console.log(`Medindo ${base}\nlinha ${letreiro || ""} (código ${linhaCodigo}${sentido ? ", sentido " + sentido : ""}) | paradas ${paradaIds.join(", ")} | ${descricaoDuracao} | ciclo de ${intervaloS} s | raio ${raio} m | rótulo: ${rotulo}`);
 console.log("Aperte Ctrl+C para encerrar antes e ver o resumo.\n");
 
 /* ---------- coleta ---------- */
-const previsoes = new Map();   // prefixo -> [{ coleta, previsto }]
+// Cada ciclo: previsão de cada parada + posição dos ônibus da linha (uma vez só).
+const previsoes = new Map();   // "parada|prefixo" -> [{ coleta, previsto }]
 const trilhas = new Map();     // prefixo -> [{ ts, lat, lon }]
+const ultimaPassagem = new Map();   // "parada|prefixo" -> instante (evita contar a mesma passagem duas vezes)
+const infoParada = new Map();  // id -> { lat, lon, nome }
 const resultados = [];
 let parar = false;
 process.on("SIGINT", () => { parar = true; });
 const fim = duracaoMin === 0 ? Infinity : Date.now() + duracaoMin * 60e3;
-let ciclos = 0, semPrevisao = 0;
+let ciclos = 0;
+const semPrevisao = Object.fromEntries(paradaIds.map((id) => [id, 0]));
 
 while (!parar && Date.now() < fim) {
-  const [pr, po] = await Promise.all([chamar("/api/previsao?parada=" + paradaId), chamar("/api/posicao?linha=" + linhaCodigo)]);
+  const respostas = await Promise.all([chamar("/api/posicao?linha=" + linhaCodigo),
+    ...paradaIds.map((id) => chamar("/api/previsao?parada=" + id))]);
+  const po = respostas[0];
   ciclos++;
-  if (pr && po) {
-    const parada = pr.corpo.parada;
-    const entrada = (pr.corpo.linhas ?? []).find((l) => String(l.codigo) === String(linhaCodigo));
-    if (!entrada || !entrada.veiculos?.length) semPrevisao++;
 
-    for (const v of entrada?.veiculos ?? []) {   // guarda as previsões
+  paradaIds.forEach((id, i) => {   // guarda as previsões de cada parada
+    const pr = respostas[i + 1];
+    if (!pr) return;
+    if (pr.corpo.parada && !infoParada.has(id)) infoParada.set(id, pr.corpo.parada);
+    const entrada = (pr.corpo.linhas ?? []).find((l) => String(l.codigo) === String(linhaCodigo));
+    if (!entrada || !entrada.veiculos?.length) { semPrevisao[id]++; return; }
+    for (const v of entrada.veiculos) {
       const previsto = instante(v.chegada, pr.agora);
       if (previsto === null) continue;
-      (previsoes.get(v.prefixo) ?? previsoes.set(v.prefixo, []).get(v.prefixo)).push({ coleta: pr.agora, previsto });
+      const chave = id + "|" + v.prefixo;
+      (previsoes.get(chave) ?? previsoes.set(chave, []).get(chave)).push({ coleta: pr.agora, previsto });
     }
+  });
 
-    for (const v of po.corpo.veiculos ?? []) {   // guarda as posições e procura passagens pela parada
-      const ts = Date.parse(v.atualizadoEm);
-      if (!Number.isFinite(ts) || !Number.isFinite(v.lat) || !Number.isFinite(v.lon)) continue;
-      const trilha = trilhas.get(v.prefixo) ?? trilhas.set(v.prefixo, []).get(v.prefixo);
-      if (trilha.length && trilha.at(-1).ts === ts) continue;   // posição repetida
-      trilha.push({ ts, lat: v.lat, lon: v.lon });
-      if (trilha.length > 40) trilha.shift();
+  for (const v of po?.corpo?.veiculos ?? []) {   // guarda as posições e procura passagens pelas paradas
+    const ts = Date.parse(v.atualizadoEm);
+    if (!Number.isFinite(ts) || !Number.isFinite(v.lat) || !Number.isFinite(v.lon)) continue;
+    const trilha = trilhas.get(v.prefixo) ?? trilhas.set(v.prefixo, []).get(v.prefixo);
+    if (trilha.length && trilha.at(-1).ts === ts) continue;   // posição repetida
+    trilha.push({ ts, lat: v.lat, lon: v.lon });
+    if (trilha.length > 40) trilha.shift();
 
+    for (const id of paradaIds) {
+      const parada = infoParada.get(id);
       const p = parada && passagem(trilha, parada);
-      const lista = previsoes.get(v.prefixo) ?? [];
-      if (p && lista.length) {
-        const comparaveis = lista.filter((x) => x.coleta <= p.ts && p.ts - x.coleta <= 30 * 60e3);
-        for (const x of comparaveis) {
-          const linhaCsv = { antecedenciaMin: (p.ts - x.coleta) / 60e3, erroMin: (x.previsto - p.ts) / 60e3 };
-          resultados.push(linhaCsv);
-          appendFileSync(ARQUIVO, [rotulo, paradaId, linhaCodigo, v.prefixo, new Date(x.coleta).toISOString(), linhaCsv.antecedenciaMin.toFixed(2),
-            new Date(x.previsto).toISOString(), new Date(p.ts).toISOString(), linhaCsv.erroMin.toFixed(2)].join(",") + "\n");
-        }
-        console.log(`ônibus ${v.prefixo} passou pela parada às ${new Date(p.ts - 3 * 3600e3).toISOString().slice(11, 19)} (a ${p.dmin.toFixed(0)} m do ponto): ${comparaveis.length} previsões comparadas`);
-        previsoes.delete(v.prefixo);
-        trilhas.set(v.prefixo, [trilha.at(-1)]);   // zera para a próxima volta
+      const chave = id + "|" + v.prefixo;
+      if (!p || (ultimaPassagem.get(chave) ?? -Infinity) > p.ts - 5 * 60e3) continue;
+      const lista = previsoes.get(chave) ?? [];
+      if (!lista.length) continue;
+      ultimaPassagem.set(chave, p.ts);
+      const comparaveis = lista.filter((x) => x.coleta <= p.ts && p.ts - x.coleta <= 30 * 60e3);
+      for (const x of comparaveis) {
+        const linhaCsv = { antecedenciaMin: (p.ts - x.coleta) / 60e3, erroMin: (x.previsto - p.ts) / 60e3 };
+        resultados.push(linhaCsv);
+        appendFileSync(ARQUIVO, [rotulo, id, linhaCodigo, v.prefixo, new Date(x.coleta).toISOString(), linhaCsv.antecedenciaMin.toFixed(2),
+          new Date(x.previsto).toISOString(), new Date(p.ts).toISOString(), linhaCsv.erroMin.toFixed(2)].join(",") + "\n");
       }
+      console.log(`ônibus ${v.prefixo} passou pela parada ${id} às ${new Date(p.ts - 3 * 3600e3).toISOString().slice(11, 19)} (a ${p.dmin.toFixed(0)} m do ponto): ${comparaveis.length} previsões comparadas`);
+      previsoes.delete(chave);
     }
   }
   if (!parar) await dormir(intervaloS * 1000);
 }
 
-console.log(`\nFim da coleta: ${ciclos} ciclos | ciclos sem previsão da linha nesta parada: ${semPrevisao} | comparações: ${resultados.length}\n`);
+console.log(`\nFim da coleta: ${ciclos} ciclos | comparações: ${resultados.length}`);
+console.log("ciclos sem previsão da linha, por parada: " + paradaIds.map((id) => `${id}: ${semPrevisao[id]}`).join(" | ") + "\n");
 if (resultados.length) resumir(resultados);
 else console.log("Nenhum ônibus passou pela parada durante a coleta (ou nenhuma previsão foi comparável). Tente uma parada mais movimentada ou deixe rodando por mais tempo.");
 console.log(`\nDados guardados em ${ARQUIVO}. Para o resumo de todas as coletas: node tools/medir-precisao-previsao.mjs --resumo`);

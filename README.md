@@ -1,4 +1,4 @@
-# Ônibus ao Vivo SP (nome provisório)
+# JotaBus
 
 Protótipo do TCC (Ciência da Computação, FAMOnline): aplicação web para acompanhar os ônibus
 de São Paulo em tempo real. Site em HTML e JavaScript puro com mapa Leaflet, instalável como

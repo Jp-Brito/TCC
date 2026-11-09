@@ -1,8 +1,8 @@
 // Configurações centrais do projeto (nome provisório e mapa).
 // Para trocar o nome, basta alterar aqui e no <title> do index.html.
 window.APP_CONFIG = {
-  nome: "Ônibus ao Vivo SP",
-  sigla: "OVSP",
+  nome: "JotaBus",
+  sigla: "JotaBus",
   painel: {
     atualizacaoMs: 12000,      // intervalo entre atualizações das previsões
     atualizacaoMaxMs: 60000,   // espera máxima quando a API está falhando
