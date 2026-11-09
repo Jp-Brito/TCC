@@ -267,8 +267,6 @@
 
   // Situação das linhas (api/situacao-trilhos, fonte não oficial). Guardada por 2 min.
   var situacao = { dados: null, em: 0, carregando: false };
-  var TEXTO_SITUACAO = { normal: "Operação normal", reduzida: "Velocidade reduzida", paralisada: "Paralisada",
-                         encerrada: "Operação encerrada", outra: "" };
 
   function carregarSituacao() {
     if (situacao.carregando || (situacao.dados && Date.now() - situacao.em < 120000)) return;
@@ -307,7 +305,7 @@
       if (sit) {
         temSituacao = true;
         var hora = horaDe(situacao.dados.atualizadoEm || situacao.dados.consultadoEm);
-        var texto = (TEXTO_SITUACAO[sit.situacao] || sit.descricao) + (est.linhas.length > 1 ? " na linha " + linha.numero : "") +
+        var texto = sit.descricao + (est.linhas.length > 1 ? " na linha " + linha.numero : "") +
           (hora ? " · atualizado às " + hora : "");
         els.corpo.appendChild(el("p", "estacao__situacao estacao__situacao--" + sit.situacao, texto));
         if (sit.motivo && sit.situacao !== "normal") els.corpo.appendChild(el("p", "estacao__motivo", sit.motivo));
@@ -344,7 +342,7 @@
     });
 
     els.rodape.textContent = "Horários programados (GTFS da SPTrans). O Metrô e a CPTM não publicam a posição dos trens em tempo real." +
-      (temSituacao ? " Situação das linhas: site da ViaMobilidade (fonte não oficial)." : "");
+      (temSituacao ? " Situação das linhas: Motiva Trilhos (fonte não oficial)." : "");
     els.resumo.textContent = resumo || "Programação indisponível";
     medirAltura();
   }

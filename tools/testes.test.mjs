@@ -203,16 +203,21 @@ caso("trilhos: cada linha traz os dois sentidos com a programação", () => {
   assert.ok(l9.estacoes.some((e) => e.nome === "Ceasa"));
 });
 
-caso("situação das linhas: lê o quadro do site (HTML de exemplo)", () => {
-  const html = `<div class="lines"><p>Atualizado em <strong>09/11/2026 16:55:12</strong></p><ul>
-    <li class="item line-4"><span title="Amarela">4</span><span class="status green">Opera&ccedil;&atilde;o Normal</span></li>
-    <li class="item line-9"><span title="Esmeralda">9</span><span class="status yellow">Velocidade Reduzida</span><p>Falha em equipamento</p></li>
-    <li class="item line-12"><span title="Safira">12</span><span class="status red">Paralisada</span></li></ul></div>`;
-  const d = lerSituacao(html);
-  assert.equal(d.linhas.length, 3);
-  assert.deepEqual(d.linhas.map((l) => l.situacao), ["normal", "reduzida", "paralisada"]);
-  assert.equal(d.linhas[0].descricao, "Operação Normal");
-  assert.equal(d.linhas[1].motivo, "Falha em equipamento");
-  assert.equal(d.atualizadoEm, "2026-11-09T16:55:12-03:00");
-  assert.equal(lerSituacao("<html>mudou tudo</html>").linhas.length, 0);   // layout novo: nada (o app esconde)
+caso("situação das linhas: lê a resposta da fonte (todas as operadoras)", () => {
+  const json = { status: true, data: { dataAtualizacao: "2026-11-09T17:16:15", concessoes: [
+    { uid: "CCRVQ", nome: "Motiva Linha Quatro", linhas: [
+      { numero: "4", nome: "Amarela", statusLinha: { codigo: "OperacaoNormal", status: "Operação Normal", descricao: "" } }] },
+    { uid: "METRO", nome: "Metro SP", linhas: [
+      { numero: 17, nome: "Ouro", statusLinha: { codigo: "OperacaoTransitoria", status: "Operação Transitória", descricao: "Operação Transitória" } },
+      { numero: 1, nome: "Azul", statusLinha: { codigo: "VelocidadeReduzida", status: "Velocidade Reduzida", descricao: "Falha em trem" } }] },
+    { uid: "TICTRENS", nome: "TIC Trens", linhas: [
+      { numero: 6, nome: "Laranja", statusLinha: { codigo: "OperacaoEncerrada", status: "Operação Encerrada", descricao: null } }] }
+  ] } };
+  const d = lerSituacao(json);
+  assert.deepEqual(d.linhas.map((l) => l.numero), [1, 4, 6, 17]);              // número como texto ou número
+  assert.deepEqual(d.linhas.map((l) => l.situacao), ["reduzida", "normal", "encerrada", "parcial"]);
+  assert.equal(d.linhas[0].motivo, "Falha em trem");
+  assert.equal(d.linhas[3].motivo, null);                                        // detalhe igual ao status: não repete
+  assert.equal(d.atualizadoEm, "2026-11-09T17:16:15-03:00");
+  assert.equal(lerSituacao({ status: false }).linhas.length, 0);                 // formato diferente: nada (o app esconde)
 });

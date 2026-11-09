@@ -196,7 +196,7 @@ body { position: relative; overflow: hidden; }
 .estacao__situacao { display: flex; align-items: center; gap: 8px; margin: 8px 4px 2px; font-size: 0.88rem; font-weight: 700; }
 .estacao__situacao::before { content: ""; flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%; background: #9ca3af; }
 .estacao__situacao--normal::before { background: #22c55e; }
-.estacao__situacao--reduzida::before { background: #f59e0b; }
+.estacao__situacao--reduzida::before, .estacao__situacao--parcial::before { background: #f59e0b; }
 .estacao__situacao--paralisada::before { background: #ef4444; }
 .estacao__motivo { margin: 0 4px 6px 22px; font-size: 0.8rem; color: var(--texto-suave); }
 .estacao__info { margin: 2px 4px 10px; font-size: 0.78rem; color: var(--texto-suave); }
