@@ -342,6 +342,13 @@
       }
     });
 
+    // Programação oficial vencida (calendar.txt): avisa sem esconder nada
+    var hojeSP = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());   // AAAA-MM-DD
+    if (est.validoAte && est.validoAte < hojeSP) {
+      var p = est.validoAte.split("-");
+      els.corpo.appendChild(el("p", "estacao__info", "⚠ A programação oficial venceu em " + p[2] + "/" + p[1] + "/" + p[0] +
+        ". Os intervalos podem estar desatualizados; a situação das linhas continua em tempo real."));
+    }
     els.rodape.textContent = "Horários programados (GTFS da SPTrans). O Metrô e a CPTM não publicam a posição dos trens em tempo real." +
       (temSituacao ? " Situação das linhas: Motiva Trilhos (fonte não oficial)." : "");
     els.resumo.textContent = resumo || "Programação indisponível";

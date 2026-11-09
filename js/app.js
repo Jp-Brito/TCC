@@ -175,7 +175,7 @@
           dados.linhas.forEach(function (linha) {
             linha.estacoes.forEach(function (e) {
               var id = Number(e.id), est = estacoesPorId.get(id);
-              if (!est) { est = { id: id, nome: e.nome, lat: e.lat, lon: e.lon, linhas: [] }; estacoesPorId.set(id, est); }
+              if (!est) { est = { id: id, nome: e.nome, lat: e.lat, lon: e.lon, linhas: [], validoAte: dados.validoAte || null }; estacoesPorId.set(id, est); }
               if (est.linhas.indexOf(linha) < 0) est.linhas.push(linha);
             });
           });

@@ -43,6 +43,20 @@ Publicado em: https://jotabus.vercel.app (o endereço antigo olhovivobus.vercel.
 Sentido: na Olho Vivo, o sentido 1 vai para o terminal principal e o 2 para o secundário
 (conferido em 08/11/2026 com ônibus reais; corresponde às direções 0 e 1 do GTFS).
 
+## Atualização automática do GTFS
+O workflow `.github/workflows/atualizar-gtfs.yml` roda sozinho **toda terça às 03:00 (SP)** nos
+servidores do GitHub: baixa o GTFS da SPTrans pela [Mobility Database](https://mobilitydatabase.org),
+confere o feed (arquivos obrigatórios e quantidades), gera de novo `data/stops.json` e
+`data/tracados.json`, roda os testes e, só se tudo passar e algo mudou, faz o commit, o que dispara
+o deploy na Vercel. Também dá para rodar na mão: aba **Actions > Atualizar GTFS > Run workflow**
+(com um link .zip opcional).
+
+- Segredo necessário: `MDB_REFRESH_TOKEN` (Settings > Secrets and variables > Actions).
+- Opcional: variável `MDB_FEED_ID` para fixar o feed (sem ela, o script acha o da SPTrans sozinho).
+- `data/gtfs-versao.json` guarda a fonte, o hash e até quando a programação vale.
+- Se a programação vencer, o painel das estações mostra um aviso (o tempo real não é afetado).
+- No PC, se quiser forçar: `MDB_REFRESH_TOKEN=... node tools/atualizar-gtfs.mjs` (ou `--url link.zip`).
+
 ## Variáveis de ambiente (Vercel e `.env.local`, nunca no Git)
 - `OLHOVIVO_TOKEN` — token da API Olho Vivo
 - `ORS_KEY` — chave da OpenRouteService (rota a pé)

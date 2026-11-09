@@ -100,7 +100,12 @@ function montar() {
     });
   }
   linhas.sort((a, b) => a.numero - b.numero);
-  return { fonte: "GTFS da SPTrans", linhas };
+  // Até quando a programação oficial vale (maior end_date do calendar.txt), para o aviso de vencida
+  const calendario = lerCsv(arquivo("gtfs/calendar.txt"));
+  const cc = col(calendario[0]);
+  const fim = calendario.slice(1).map((l) => l[cc.end_date]).filter((x) => /^\d{8}$/.test(x)).sort().at(-1);
+  const validoAte = fim ? `${fim.slice(0, 4)}-${fim.slice(4, 6)}-${fim.slice(6, 8)}` : null;
+  return { fonte: "GTFS da SPTrans", validoAte, linhas };
 }
 
 export default function handler(req, res) {

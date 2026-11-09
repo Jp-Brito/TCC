@@ -1,0 +1,56 @@
+# Atualiza sozinho o GTFS da SPTrans toda terça e publica o app (a Vercel faz o deploy
+# quando o robô dá o push). Também pode ser rodado na mão: aba Actions > Atualizar GTFS > Run workflow.
+# Precisa do segredo MDB_REFRESH_TOKEN (Settings > Secrets and variables > Actions).
+name: Atualizar GTFS
+
+on:
+  schedule:
+    - cron: '0 6 * * 2'   # toda terça, 06:00 UTC = 03:00 em São Paulo
+  workflow_dispatch:
+    inputs:
+      gtfs_url:
+        description: 'Link direto para um .zip GTFS (opcional, para testes)'
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atualizar-gtfs
+  cancel-in-progress: false
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Baixar o GTFS e gerar os dados
+        id: gtfs
+        env:
+          MDB_REFRESH_TOKEN: ${{ secrets.MDB_REFRESH_TOKEN }}
+          MDB_FEED_ID: ${{ vars.MDB_FEED_ID }}
+          GTFS_URL: ${{ inputs.gtfs_url }}
+        run: node tools/atualizar-gtfs.mjs
+
+      - name: Testes automáticos (se falharem, nada é publicado)
+        if: steps.gtfs.outputs.mudou == 'sim'
+        run: node --test tools/testes.test.mjs
+
+      - name: Commitar e publicar, se mudou
+        if: steps.gtfs.outputs.mudou == 'sim'
+        run: |
+          if git diff --quiet -- data && [ -z "$(git ls-files --others --exclude-standard data)" ]; then
+            echo "Dados iguais aos atuais: nada a publicar."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          git commit -m "chore: GTFS atualizado em ${{ steps.gtfs.outputs.versao }}"
+          git push

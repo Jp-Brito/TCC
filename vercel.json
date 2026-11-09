@@ -34,7 +34,7 @@
       "includeFiles": "data/{gtfs/trips.txt,gtfs/stop_times.txt,tracados.json,stops.json}"
     },
     "api/trilhos.js": {
-      "includeFiles": "data/{tracados.json,stops.json,gtfs/routes.txt,gtfs/trips.txt,gtfs/stop_times.txt,gtfs/frequencies.txt}"
+      "includeFiles": "data/{tracados.json,stops.json,gtfs/routes.txt,gtfs/trips.txt,gtfs/stop_times.txt,gtfs/frequencies.txt,gtfs/calendar.txt}"
     }
   },
   "regions": [
