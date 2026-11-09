@@ -615,56 +615,62 @@
     }
   }
 
+  // Um item da lista de favoritos (usado aqui e na lupa). aoMudar: chamada depois de remover.
+  function criarItemFavorito(f, aoMudar) {
+    var li = document.createElement("li");
+    li.className = "favoritos__linha";
+    var botao = document.createElement("button");
+    botao.type = "button";
+    botao.className = "busca__item";
+    var pilula = document.createElement("span");
+    pilula.className = "busca__pilula favoritos__pilula";
+    if (f.tipo === "linha") {
+      var cor = Painel.corDaLinha(f.cor);
+      pilula.textContent = f.nome;
+      pilula.style.background = "#" + cor.fundo;
+      pilula.style.color = "#" + cor.texto;
+    } else {
+      pilula.textContent = f.tipo === "estacao" ? "🚆" : "🚏";
+      if (f.tipo === "estacao" && f.cor) { pilula.style.background = "#" + f.cor; pilula.style.color = "#ffffff"; }
+    }
+    botao.appendChild(pilula);
+    var texto = document.createElement("span");
+    texto.className = "busca__texto";
+    var nome = document.createElement("span");
+    nome.className = "busca__nome";
+    nome.textContent = f.tipo === "linha" ? "Linha " + f.nome : f.nome;
+    var sub = document.createElement("span");
+    sub.className = "busca__detalhe";
+    sub.textContent = f.sub || "";
+    texto.appendChild(nome);
+    texto.appendChild(sub);
+    botao.appendChild(texto);
+    botao.addEventListener("click", function () { abrirFavorito(f); });
+    var remover = document.createElement("button");
+    remover.type = "button";
+    remover.className = "icon-btn icon-btn--pequeno favoritos__remover";
+    remover.setAttribute("aria-label", "Remover " + f.nome + " dos favoritos");
+    remover.textContent = "✕";
+    remover.addEventListener("click", function () {
+      gravarFavoritos(lerFavoritos().filter(function (x) { return chaveFavorito(x) !== chaveFavorito(f); }));
+      atualizarEstrela();
+      if (aoMudar) aoMudar();
+    });
+    li.appendChild(botao);
+    li.appendChild(remover);
+    return li;
+  }
+
   function desenharFavoritos() {
     var lista = lerFavoritos();
     listaFavoritos.textContent = "";
     document.getElementById("favoritosMsg").textContent = lista.length ? "" :
       "Nada guardado ainda. Abra uma parada, linha ou estação e toque na ⭐ do painel.";
-    lista.forEach(function (f) {
-      var li = document.createElement("li");
-      li.className = "favoritos__linha";
-      var botao = document.createElement("button");
-      botao.type = "button";
-      botao.className = "busca__item";
-      var pilula = document.createElement("span");
-      pilula.className = "busca__pilula favoritos__pilula";
-      if (f.tipo === "linha") {
-        var cor = Painel.corDaLinha(f.cor);
-        pilula.textContent = f.nome;
-        pilula.style.background = "#" + cor.fundo;
-        pilula.style.color = "#" + cor.texto;
-      } else {
-        pilula.textContent = f.tipo === "estacao" ? "🚆" : "🚏";
-        if (f.tipo === "estacao" && f.cor) { pilula.style.background = "#" + f.cor; pilula.style.color = "#ffffff"; }
-      }
-      botao.appendChild(pilula);
-      var texto = document.createElement("span");
-      texto.className = "busca__texto";
-      var nome = document.createElement("span");
-      nome.className = "busca__nome";
-      nome.textContent = f.tipo === "linha" ? "Linha " + f.nome : f.nome;
-      var sub = document.createElement("span");
-      sub.className = "busca__detalhe";
-      sub.textContent = f.sub || "";
-      texto.appendChild(nome);
-      texto.appendChild(sub);
-      botao.appendChild(texto);
-      botao.addEventListener("click", function () { abrirFavorito(f); });
-      var remover = document.createElement("button");
-      remover.type = "button";
-      remover.className = "icon-btn icon-btn--pequeno favoritos__remover";
-      remover.setAttribute("aria-label", "Remover " + f.nome + " dos favoritos");
-      remover.textContent = "✕";
-      remover.addEventListener("click", function () {
-        gravarFavoritos(lerFavoritos().filter(function (x) { return chaveFavorito(x) !== chaveFavorito(f); }));
-        desenharFavoritos();
-        atualizarEstrela();
-      });
-      li.appendChild(botao);
-      li.appendChild(remover);
-      listaFavoritos.appendChild(li);
-    });
+    lista.forEach(function (f) { listaFavoritos.appendChild(criarItemFavorito(f, desenharFavoritos)); });
   }
+
+  // A lupa (busca.js) também mostra os favoritos
+  window.Favoritos = { listar: lerFavoritos, criarItem: criarItemFavorito };
 
   function abrirFavoritos() {
     if (window.Busca && window.Busca.fechar) window.Busca.fechar();

@@ -417,6 +417,9 @@ body.painel-aberto .leaflet-bottom { bottom: var(--altura-painel); }
 .busca__texto { display: flex; flex-direction: column; min-width: 0; }
 .busca__nome { font-weight: 600; font-size: 0.9rem; overflow-wrap: anywhere; }
 .busca__detalhe { font-size: 0.75rem; color: var(--texto-suave); }
+.busca__secao { margin: 6px 4px 0; font-size: 0.78rem; font-weight: 700; color: var(--texto-suave); }
+.busca__secao--com-botao { display: flex; align-items: center; justify-content: space-between; }
+.busca__limpar { border: 0; background: transparent; color: var(--cor-marca); font: inherit; font-size: 0.78rem; font-weight: 700; cursor: pointer; padding: 2px 4px; }
 .busca__msg { margin: 8px 4px 0; font-size: 0.85rem; color: var(--texto-suave); }
 .busca__msg:empty { display: none; }
 
