@@ -537,6 +537,153 @@
   // Mesmo com o botão desligado, carrega para saber quais pontos são estações
   carregarTrilhos().then(desenharParadas).catch(function () { /* sem trilhos: estações ficam como pontos comuns */ });
 
+  /* ---------- Favoritos (paradas, linhas e estações) ---------- */
+  // Guardados só neste aparelho (localStorage), sem conta e sem enviar nada a servidor.
+  var FAVORITOS_MAX = 30;
+  var caixaFavoritos = document.getElementById("favoritos");
+  var listaFavoritos = document.getElementById("favoritosLista");
+  var btnFavoritos = document.getElementById("btnFavoritos");
+  var estrela = null;
+
+  function lerFavoritos() {
+    try { return JSON.parse(localStorage.getItem("busjp-favoritos") || "[]") || []; } catch (e) { return []; }
+  }
+  function gravarFavoritos(lista) {
+    try { localStorage.setItem("busjp-favoritos", JSON.stringify(lista.slice(0, FAVORITOS_MAX))); } catch (e) {}
+  }
+  function chaveFavorito(f) { return f.tipo + ":" + f.id; }
+  function ehFavorito(item) {
+    return Boolean(item) && lerFavoritos().some(function (f) { return chaveFavorito(f) === chaveFavorito(item); });
+  }
+
+  function alternarFavorito() {
+    var item = Painel.itemAtual();
+    if (!item) return;
+    var lista = lerFavoritos();
+    if (ehFavorito(item)) {
+      lista = lista.filter(function (f) { return chaveFavorito(f) !== chaveFavorito(item); });
+      mostrarAviso("Removido dos favoritos.", 2500);
+    } else {
+      lista.unshift(item);
+      mostrarAviso("⭐ Guardado nos favoritos.", 2500);
+    }
+    gravarFavoritos(lista);
+    atualizarEstrela();
+    if (!caixaFavoritos.hidden) desenharFavoritos();
+  }
+
+  var ESTRELA_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" ' +
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>';
+
+  // Estrela no cabeçalho do painel: cheia quando o que está aberto é favorito
+  function atualizarEstrela() {
+    if (!estrela) return;
+    var item = Painel.itemAtual();
+    var marcado = ehFavorito(item);
+    estrela.hidden = !item;
+    estrela.classList.toggle("ativo", marcado);
+    estrela.setAttribute("aria-pressed", marcado ? "true" : "false");
+    estrela.setAttribute("aria-label", marcado ? "Remover dos favoritos" : "Guardar nos favoritos");
+    estrela.title = estrela.getAttribute("aria-label");
+  }
+
+  (function criarEstrela() {
+    var botoes = document.querySelector("#painel .painel__botoes");
+    if (!botoes) return;
+    estrela = document.createElement("button");
+    estrela.type = "button";
+    estrela.className = "icon-btn icon-btn--pequeno painel__favorito";
+    estrela.innerHTML = ESTRELA_SVG;
+    estrela.hidden = true;
+    estrela.addEventListener("click", alternarFavorito);
+    botoes.insertBefore(estrela, botoes.firstChild);
+  })();
+  document.addEventListener("painel:mudou", atualizarEstrela);
+
+  function abrirFavorito(f) {
+    fecharFavoritos();
+    if (f.tipo === "linha" && f.dados) { Painel.abrirLinha(f.dados); return; }
+    if (Number.isFinite(f.lat) && Number.isFinite(f.lon)) mapa.setView([f.lat, f.lon], Math.max(mapa.getZoom(), 16));
+    if (f.tipo === "parada" && f.dados) { Painel.abrir(f.dados); return; }
+    if (f.tipo === "estacao") {
+      carregarTrilhos().then(function () {
+        var est = estacoesPorId.get(Number(f.id));
+        if (est) Painel.abrirEstacao(est);
+        else mostrarAviso("Esta estação não foi encontrada nos dados atuais.");
+      }).catch(function () { mostrarAviso("Não foi possível carregar as estações agora."); });
+    }
+  }
+
+  function desenharFavoritos() {
+    var lista = lerFavoritos();
+    listaFavoritos.textContent = "";
+    document.getElementById("favoritosMsg").textContent = lista.length ? "" :
+      "Nada guardado ainda. Abra uma parada, linha ou estação e toque na ⭐ do painel.";
+    lista.forEach(function (f) {
+      var li = document.createElement("li");
+      li.className = "favoritos__linha";
+      var botao = document.createElement("button");
+      botao.type = "button";
+      botao.className = "busca__item";
+      var pilula = document.createElement("span");
+      pilula.className = "busca__pilula favoritos__pilula";
+      if (f.tipo === "linha") {
+        var cor = Painel.corDaLinha(f.cor);
+        pilula.textContent = f.nome;
+        pilula.style.background = "#" + cor.fundo;
+        pilula.style.color = "#" + cor.texto;
+      } else {
+        pilula.textContent = f.tipo === "estacao" ? "🚆" : "🚏";
+        if (f.tipo === "estacao" && f.cor) { pilula.style.background = "#" + f.cor; pilula.style.color = "#ffffff"; }
+      }
+      botao.appendChild(pilula);
+      var texto = document.createElement("span");
+      texto.className = "busca__texto";
+      var nome = document.createElement("span");
+      nome.className = "busca__nome";
+      nome.textContent = f.tipo === "linha" ? "Linha " + f.nome : f.nome;
+      var sub = document.createElement("span");
+      sub.className = "busca__detalhe";
+      sub.textContent = f.sub || "";
+      texto.appendChild(nome);
+      texto.appendChild(sub);
+      botao.appendChild(texto);
+      botao.addEventListener("click", function () { abrirFavorito(f); });
+      var remover = document.createElement("button");
+      remover.type = "button";
+      remover.className = "icon-btn icon-btn--pequeno favoritos__remover";
+      remover.setAttribute("aria-label", "Remover " + f.nome + " dos favoritos");
+      remover.textContent = "✕";
+      remover.addEventListener("click", function () {
+        gravarFavoritos(lerFavoritos().filter(function (x) { return chaveFavorito(x) !== chaveFavorito(f); }));
+        desenharFavoritos();
+        atualizarEstrela();
+      });
+      li.appendChild(botao);
+      li.appendChild(remover);
+      listaFavoritos.appendChild(li);
+    });
+  }
+
+  function abrirFavoritos() {
+    if (window.Busca && window.Busca.fechar) window.Busca.fechar();
+    desenharFavoritos();
+    caixaFavoritos.hidden = false;
+    btnFavoritos.setAttribute("aria-expanded", "true");
+  }
+  function fecharFavoritos() {
+    caixaFavoritos.hidden = true;
+    btnFavoritos.setAttribute("aria-expanded", "false");
+  }
+  btnFavoritos.addEventListener("click", function () {
+    if (caixaFavoritos.hidden) abrirFavoritos(); else fecharFavoritos();
+  });
+  document.getElementById("favoritosFechar").addEventListener("click", fecharFavoritos);
+  document.getElementById("btnBusca").addEventListener("click", fecharFavoritos);   // um por vez
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !caixaFavoritos.hidden) fecharFavoritos(); });
+  mapa.on("click", fecharFavoritos);
+
   /* ---------- Instalar como aplicativo (PWA) ---------- */
   var btnInstalar = document.getElementById("btnInstalar");
   var eventoInstalacao = null;

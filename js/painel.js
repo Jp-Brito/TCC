@@ -49,6 +49,7 @@
     dataServidor: NaN,     // hora do servidor (cabeçalho Date da resposta)
     recebidoEm: 0,
     proximaEm: 0,          // quando será a próxima tentativa (Date.now)
+    soAcessiveis: false,   // filtro ♿: mostra só ônibus acessíveis (lembrado no aparelho)
     ultimoSucesso: 0       // quando a última atualização deu certo (Date.now), para o aviso de dado velho
   };
 
@@ -61,6 +62,39 @@
   var alertaEl = null;     // faixa de aviso no topo do painel
   var LIMITE_GPS_S = 180;  // posição mais nova com mais de 3 min = GPS da SPTrans atrasado
   var LIMITE_ETIQUETA_S = 90;  // ônibus com posição mais velha que isso ganha a etiqueta amarela
+
+  /* ---------- Filtro de ônibus acessíveis (♿) ---------- */
+  // Os dados ficam completos; o filtro só esconde, na lista e no mapa, os ônibus que a
+  // SPTrans não informa como acessíveis.
+  try { estado.soAcessiveis = localStorage.getItem("busjp-acessiveis") === "1"; } catch (e) {}
+
+  function visiveis(veiculos) {
+    return estado.soAcessiveis ? (veiculos || []).filter(function (v) { return v.acessivel; }) : (veiculos || []);
+  }
+
+  // Cópia das linhas da parada só com os ônibus visíveis (e sem as linhas que ficaram vazias)
+  function linhasVisiveis() {
+    return estado.linhas
+      .map(function (l) { return Object.assign({}, l, { veiculos: visiveis(l.veiculos) }); })
+      .filter(function (l) { return l.veiculos.length > 0; });
+  }
+
+  var botaoAcessivel = null;
+  function atualizarBotaoAcessivel() {
+    if (!botaoAcessivel) return;
+    botaoAcessivel.classList.toggle("ativo", estado.soAcessiveis);
+    botaoAcessivel.setAttribute("aria-pressed", estado.soAcessiveis ? "true" : "false");
+    botaoAcessivel.hidden = Boolean(estado.estacao);   // estação de trem: não se aplica
+  }
+
+  function alternarAcessiveis() {
+    estado.soAcessiveis = !estado.soAcessiveis;
+    try { localStorage.setItem("busjp-acessiveis", estado.soAcessiveis ? "1" : "0"); } catch (e) {}
+    atualizarBotaoAcessivel();
+    if (!ativo()) return;
+    renderizar();
+    if (!estado.estacao) desenharOnibus();
+  }
 
   /* ---------- Funções de apoio (também usadas nos testes) ---------- */
 
@@ -200,19 +234,22 @@
     els.sub.textContent = linha.destino ? "Sentido: " + linha.destino : item.rotulo;
     els.corpo.textContent = "";
 
+    var lista = visiveis(linha.veiculos);
     if (estado.carregando && linha.veiculos.length === 0) {
       els.corpo.appendChild(el("p", "painel__aviso", "Buscando os ônibus da linha..."));
     } else if (estado.erro && linha.veiculos.length === 0) {
       // a faixa amarela (atualizarAlerta) explica a falha
     } else if (linha.veiculos.length === 0) {
       els.corpo.appendChild(el("p", "painel__aviso", "Nenhum ônibus em circulação nesta linha agora."));
+    } else if (lista.length === 0) {
+      els.corpo.appendChild(el("p", "painel__aviso", "♿ Nenhum ônibus acessível em circulação nesta linha agora. Toque em ♿ para ver todos."));
     } else {
-      linha.veiculos.forEach(function (v) {
+      lista.forEach(function (v) {
         var botao = el("button", "onibus-item");
         botao.type = "button";
         botao.appendChild(el("span", "onibus-item__prefixo", "Ônibus " + v.prefixo));
         botao.appendChild(el("span", "onibus-item__idade", "posição " + textoIdade(idadeSegundos(v.atualizadoEm))));
-        if (v.acessivel) botao.appendChild(el("span", "onibus-item__tag", "acessível"));
+        if (v.acessivel) botao.appendChild(el("span", "onibus-item__tag", "♿ acessível"));
         botao.addEventListener("click", function () {
           var m = marcadores[v.prefixo];
           if (!m) return;
@@ -226,7 +263,7 @@
     var rodape = estado.horaReferencia ? "Atualizado às " + estado.horaReferencia : "";
     els.rodape.textContent = rodape + complementoRodape();
 
-    var n = linha.veiculos.length;
+    var n = lista.length;
     els.resumo.textContent = estado.carregando && n === 0 ? "Buscando os ônibus..."
       : n + (n === 1 ? " ônibus em circulação" : " ônibus em circulação");
     if (atualizarAlerta()) els.resumo.textContent = "⚠ " + els.resumo.textContent;
@@ -389,6 +426,7 @@
   }
 
   function renderizar() {
+    atualizarBotaoAcessivel();
     if (estado.estacao) { renderizarEstacao(); return; }
     if (estado.modoLinha) { renderizarLinha(); return; }
     els.titulo.textContent = estado.parada.nome;
@@ -403,8 +441,10 @@
       // a faixa amarela (atualizarAlerta) explica a falha
     } else if (estado.linhas.length === 0) {
       els.corpo.appendChild(el("p", "painel__aviso", "Nenhum ônibus previsto para este ponto agora."));
+    } else if (linhasVisiveis().length === 0) {
+      els.corpo.appendChild(el("p", "painel__aviso", "♿ Nenhum ônibus acessível previsto para este ponto agora. Toque em ♿ para ver todos."));
     } else {
-      estado.linhas.forEach(function (linha) {
+      linhasVisiveis().forEach(function (linha) {
         els.corpo.appendChild(criarLinha(linha));
       });
     }
@@ -414,7 +454,7 @@
     els.rodape.textContent = rodape;
 
     // Resumo mostrado quando o painel está minimizado: linha selecionada e a próxima chegada
-    var selecionada = estado.linhas.filter(function (l) { return l.codigo === estado.codigoSelecionado; })[0];
+    var selecionada = linhasVisiveis().filter(function (l) { return l.codigo === estado.codigoSelecionado; })[0];
     els.resumo.textContent = selecionada
       ? selecionada.letreiro + " · " + textoTempo(selecionada.veiculos[0].minutos) + (selecionada.destino ? " · " + selecionada.destino : "")
       : (estado.carregando ? "Buscando previsões..." : "Nenhum ônibus previsto agora");
@@ -447,7 +487,7 @@
 
     var tempo = el("span", "linha__tempo");
     tempo.appendChild(el("strong", "", textoTempo(primeiro.minutos)));
-    tempo.appendChild(el("small", "", primeiro.chegada + (primeiro.acessivel ? " · acessível" : "")));
+    tempo.appendChild(el("small", "", primeiro.chegada + (primeiro.acessivel ? " · ♿" : "")));
     botao.appendChild(tempo);
 
     botao.addEventListener("click", function () {
@@ -683,7 +723,7 @@
     raiz.appendChild(el("div", "popup-onibus__coord",
       veiculo.lat.toFixed(5) + ", " + veiculo.lon.toFixed(5)));
     raiz.appendChild(el("div", "popup-onibus__coord",
-      "Prefixo " + veiculo.prefixo + (veiculo.acessivel ? " · acessível" : "")));
+      "Prefixo " + veiculo.prefixo + (veiculo.acessivel ? " · ♿ acessível" : "")));
 
     return { raiz: raiz, idadeEl: idadeEl };
   }
@@ -972,7 +1012,7 @@
     var pontos = estado.parada ? [[estado.parada.lat, estado.parada.lon]] : [];
     var presentes = {};
 
-    linha.veiculos.forEach(function (v) {
+    visiveis(linha.veiculos).forEach(function (v) {
       if (!Number.isFinite(v.lat) || !Number.isFinite(v.lon)) return;
       presentes[v.prefixo] = true;
       pontos.push([v.lat, v.lon]);
@@ -1390,6 +1430,28 @@
     avisarMudanca();
   }
 
+  // O que está aberto no painel, no formato usado pelos favoritos (app.js)
+  function itemAtual() {
+    if (estado.estacao) {
+      var e = estado.estacao;
+      return { tipo: "estacao", id: String(e.id), nome: "Estação " + e.nome,
+               sub: e.linhas.map(function (l) { return l.nome; }).join(" · "),
+               cor: e.linhas.length === 1 ? e.linhas[0].cor : null, lat: e.lat, lon: e.lon };
+    }
+    if (estado.modoLinha) {
+      var m = estado.modoLinha, destino = (estado.linhas[0] && estado.linhas[0].destino) || m.destino;
+      return { tipo: "linha", id: String(m.codigo), nome: m.letreiro, sub: destino ? "→ " + destino : (m.rotulo || ""),
+               cor: m.cor, dados: { codigo: m.codigo, letreiro: m.letreiro, sentido: m.sentido, cor: m.cor,
+                                    destino: m.destino, rotulo: m.rotulo } };
+    }
+    if (estado.parada) {
+      var p = estado.parada;
+      return { tipo: "parada", id: String(p.id), nome: p.nome, sub: p.referencia || "Parada " + p.id,
+               lat: p.lat, lon: p.lon, dados: { id: p.id, nome: p.nome, referencia: p.referencia || "", lat: p.lat, lon: p.lon } };
+    }
+    return null;
+  }
+
   function estaAberto() {
     return ativo();
   }
@@ -1417,6 +1479,17 @@
     camadaParadasLinha = L.layerGroup().addTo(mapa);
     camadaCaminho = L.layerGroup().addTo(mapa);
     camadaOnibus = L.layerGroup().addTo(mapa);
+
+    // Botão ♿ (filtro de ônibus acessíveis), antes do minimizar
+    botaoAcessivel = document.createElement("button");
+    botaoAcessivel.type = "button";
+    botaoAcessivel.className = "icon-btn icon-btn--pequeno painel__acessivel";
+    botaoAcessivel.textContent = "♿";
+    botaoAcessivel.title = "Mostrar só ônibus acessíveis";
+    botaoAcessivel.setAttribute("aria-label", "Mostrar só ônibus acessíveis");
+    botaoAcessivel.addEventListener("click", alternarAcessiveis);
+    els.minimizar.parentNode.insertBefore(botaoAcessivel, els.minimizar);
+    atualizarBotaoAcessivel();
 
     // Linha com a distância a pé, entre o cabeçalho e a lista do painel
     caminho.el = document.createElement("button");
@@ -1464,6 +1537,7 @@
     fechar: fechar,
     estaAberto: estaAberto,
     definirPosicaoUsuario: definirPosicaoUsuario,
+    itemAtual: itemAtual,
     abrirEstacao: abrirEstacao,
     decodificarPolilinha: decodificarPolilinha,
     _teste: {
