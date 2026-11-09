@@ -741,9 +741,11 @@
 
   /* ---------- Caminho a pé até a parada ---------- */
   // Aparece só quando o usuário abre uma parada (caminho até ela) ou busca uma linha
-  // (caminho até a parada da linha mais próxima). Primeiro desenha uma linha reta
-  // tracejada com tempo estimado (reta + 30%, a 80 m/min); depois tenta a rota pelas ruas
-  // em api/rota-a-pe (OpenRouteService). Se a rota falhar, fica a estimativa.
+  // (caminho até a parada da linha mais próxima). Regras:
+  //   - mais de ROTA_MAX_M em linha reta: não mostra nada (longe demais para ir a pé);
+  //   - até ROTA_MAX_M: pede a rota pelas ruas em api/rota-a-pe (OpenRouteService);
+  //   - só se o serviço de rotas falhar, desenha a linha reta com tempo estimado
+  //     (reta + 30%, a 80 m/min), marcada como aproximada.
   var FATOR_RUAS = 1.3, CAMINHADA_M_MIN = 80, ROTA_MAX_M = 3000;
 
   function textoCaminho(metros, minutos, aproximado) {
@@ -781,26 +783,30 @@
     if (!posUsuario || !parada || !Number.isFinite(parada.lat) || !Number.isFinite(parada.lon)) return;
     var origem = posUsuario.slice(), destino = [parada.lat, parada.lon];
     var reta = distanciaM({ lat: origem[0], lon: origem[1] }, { lat: destino[0], lon: destino[1] });
-    if (reta > 20000) return;                 // longe demais da parada: não faz sentido ir a pé
+    if (reta > ROTA_MAX_M) return;            // longe demais para ir a pé: não mostra nada
     caminho.alvo = parada;
     caminho.origem = origem;
     caminho.irParaParada = Boolean(irParaParada);
-    desenharLinhaCaminho([origem, destino], true);
-    mostrarTextoCaminho(textoCaminho(reta, Math.round(reta * FATOR_RUAS / CAMINHADA_M_MIN), true));
-    if (reta > ROTA_MAX_M) return;
 
     var chave = origem[0].toFixed(4) + "," + origem[1].toFixed(4) + ">" + destino[0].toFixed(5) + "," + destino[1].toFixed(5);
     var usar = function (rota) {
-      if (caminho.alvo !== parada || !rota || !rota.pontos || rota.pontos.length < 2) return;
+      if (caminho.alvo !== parada) return;     // a pessoa já abriu outra coisa
+      if (!rota || !rota.pontos || rota.pontos.length < 2) { usarReta(); return; }
       desenharLinhaCaminho(rota.pontos, false);
       mostrarTextoCaminho(textoCaminho(rota.distanciaM, Math.round(rota.duracaoS / 60), false));
+    };
+    // Plano B, só quando o serviço de rotas não responde: linha reta aproximada
+    var usarReta = function () {
+      if (caminho.alvo !== parada) return;
+      desenharLinhaCaminho([origem, destino], true);
+      mostrarTextoCaminho(textoCaminho(reta, Math.round(reta * FATOR_RUAS / CAMINHADA_M_MIN), true));
     };
     if (rotasCache[chave]) { usar(rotasCache[chave]); return; }
     fetch("api/rota-a-pe?de=" + origem[0].toFixed(5) + "," + origem[1].toFixed(5) +
           "&para=" + destino[0].toFixed(5) + "," + destino[1].toFixed(5))
       .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
       .then(function (rota) { rotasCache[chave] = rota; usar(rota); })
-      .catch(function () { /* sem rota pelas ruas: fica a linha reta aproximada */ });
+      .catch(usarReta);
   }
 
   // Modo linha: parada da linha mais próxima do usuário
