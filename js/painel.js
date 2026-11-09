@@ -663,10 +663,11 @@
     return anterior.rumo;
   }
 
+  // Pop-up do ônibus, enxuto: "linha / destino" (roxo), idade da posição, onde ele está
+  // (nome da parada mais próxima, até 300 m) e o prefixo.
   function conteudoPopup(linha, veiculo) {
     var raiz = el("div", "popup-onibus");
-    raiz.appendChild(el("strong", "popup-onibus__titulo", linha.letreiro));
-    raiz.appendChild(el("div", "popup-onibus__linha", "Sentido: " + (linha.destino || "—")));
+    raiz.appendChild(el("strong", "popup-onibus__titulo", linha.letreiro + (linha.destino ? " / " + linha.destino : "")));
 
     var idade = el("div", "popup-onibus__linha");
     idade.appendChild(document.createTextNode("Atualizado "));
@@ -674,15 +675,9 @@
     idade.appendChild(idadeEl);
     raiz.appendChild(idade);
 
-    // Localização: parada mais próxima (se houver) e coordenadas
     var indice = obterIndice();
     var perto = indice ? indice.maisProxima(veiculo.lat, veiculo.lon, 300) : null;
-    if (perto) {
-      var metros = Math.max(10, Math.round(perto.metros / 10) * 10);
-      raiz.appendChild(el("div", "popup-onibus__linha", "Perto de: " + perto.parada.nome + " (" + metros + " m)"));
-    }
-    raiz.appendChild(el("div", "popup-onibus__coord",
-      veiculo.lat.toFixed(5) + ", " + veiculo.lon.toFixed(5)));
+    if (perto) raiz.appendChild(el("div", "popup-onibus__linha", perto.parada.nome));
     raiz.appendChild(el("div", "popup-onibus__coord",
       "Prefixo " + veiculo.prefixo + (veiculo.acessivel ? " · ♿ acessível" : "")));
 
