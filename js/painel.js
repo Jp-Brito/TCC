@@ -330,6 +330,14 @@
     paradasDesenhadasDe = null;
     camadaTracado.clearLayers();
     tracadoDesenhadoDe = null;
+    // Desenha a(s) linha(s) de metrô/trem que passam na estação, sem mudar o zoom
+    est.linhas.forEach(function (linha) {
+      if (!linha.polilinha) return;
+      var pontos = decodificarPolilinha(linha.polilinha);
+      var opcoes = { interactive: false, lineJoin: "round", lineCap: "round" };
+      L.polyline(pontos, Object.assign({ color: "#ffffff", weight: 9, opacity: 0.55 }, opcoes)).addTo(camadaTracado);
+      L.polyline(pontos, Object.assign({ color: "#" + corDaLinha(linha.cor).fundo, weight: 6, opacity: 0.95 }, opcoes)).addTo(camadaTracado);
+    });
     L.circleMarker([est.lat, est.lon], {
       radius: 17, color: "#8B5CF6", weight: 3, fill: false, interactive: false
     }).addTo(camadaSelecao);
