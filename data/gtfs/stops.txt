@@ -1360,6 +1360,8 @@ stop_id,"stop_name","stop_desc",stop_lat,stop_lon
 2009284,"R. Lutécia, 1025","Ref.: Rua Luiza Conceição Moraes",-23.552754,-46.543096
 2009285,"R. Luzia Da Conceição Moraes, 450","Ref.: Rua Lutecia",-23.552913,-46.543492
 2009286,"Av. Cons. Carrão, 2893","Ref.: Rua Luis Pinto - Upa Masataka Ota",-23.550085,-46.533933
+2009288,"Av. Dezenove De Janeiro, 824","Av. Dezenove De Janeiro, 824 Ref.: Externo Ao Terminal Carrão",-23.558017,-46.522714
+2009289,"R. Dulce, 295","Ref.: R. Renato Rinaldi / Tr. Antônio Baú",-23.552073,-46.536442
 2110547,"R. Águas Virtuosas, 374","Ref.: Rua Francisco Diogo",-23.501035,-46.654697
 2110601,"R. Ságuairu, 581","Ref.: R Domingos Fasolari / R Urbanio Duarte",-23.510958,-46.655142
 2110922,"Av. José De Brito De Freitas, 385","Ref.: Av Br. Da Vitoria / R. Pe. Venâncio De Rezende",-23.500951,-46.662701
@@ -1548,7 +1550,6 @@ stop_id,"stop_name","stop_desc",stop_lat,stop_lon
 2301832,"Av. Do Jangadeiro, 634","Ref.: Rua Suapé",-23.707702,-46.696508
 2301833,"Av. Rubens Montanaro De Borba, 127","Ref.: Rua Duzolina Gracioli Eleno",-23.708182,-46.694333
 2301838,"Av. Rubens Montanaro De Borba, 859","Ref.: Pça. Do Condestavel",-23.713885,-46.691503
-2301841,"Av. Matias Beck, 100","Ref.: Av Gregorio Bezerra",-23.709202,-46.688926
 2314346,"R. Balneário São José, 30","Ref.: Ac. Pavão Real",-23.766867,-46.720859
 2314360,"Av. Pres. João Goulart, 479","Ref.: R. Jose Mallofre Segarra",-23.722000,-46.694487
 2314377,"Av. Lourenço Cabreira, 794","Ref.: Praça João Beiçola",-23.714590,-46.690081
@@ -1849,6 +1850,7 @@ stop_id,"stop_name","stop_desc",stop_lat,stop_lon
 2515431,"R. René De Toledo, 533","Ref.: Rua Visconde De Mayrinc",-23.600599,-46.404411
 2515433,"Av. Cachoeira Do Campo Grande, 149","Ref.: Rua Lorenzo Fiorentini",-23.584037,-46.396809
 2515435,"R. Wilma Flor, 316","Ref.: Rua Victor Orban/ Rua Nascente -- Oposto À Congregação Cristã",-23.575133,-46.396002
+2515437,"R. Wilson Fernando S. Carvalho, 159","Ref.: Rua Doce Coração",-23.578484,-46.393014
 2515438,"R. Wilson Fernando S. Carvalho, 13","Ref.: Rua Pai Nosso",-23.579091,-46.394056
 2515439,"R. Dos Pedreiros, 79","Ref.: Rua João Mateus - Condominio Guariba",-23.605191,-46.402822
 2515442,"R. Br. Barroso Do Amazonas, 78","R. Br. Barroso Do Amazonas, 78 Ref.: Ceu Inácio Monteiro",-23.569365,-46.410849
@@ -10512,7 +10514,6 @@ stop_id,"stop_name","stop_desc",stop_lat,stop_lon
 200008601,"R. Francisca De Paula, 504","Ref.: Tr Carlos Magno/ R Augusto Reginato",-23.558463,-46.530592
 200008602,"R. Francisca De Paula, 167","Ref.: R Rogerio Giorgi/ R Ricardo Bertolini",-23.555048,-46.528355
 200008609,"R. Dulce, 214","Ref.: R Rogerio Giorgi/ R Engenheiro Pegado",-23.551340,-46.536205
-200008610,"R. Dulce, 363","Ref.: R Renato Rinaldi/ R Joao Vieira Prioste",-23.552677,-46.536821
 200008611,"R. Dulce, 446","Ref.: R Renato Rinaldi/ R Joao Vieira Prioste",-23.553268,-46.537248
 200008612,"R. Xiririca, 1171","Ref.: R Dulce/ R Boicininga",-23.554418,-46.537470
 200008613,"R. Picinguaba, 808","Ref.: R Cangioca/ R Xiririca",-23.555307,-46.536280
@@ -10588,8 +10589,8 @@ stop_id,"stop_name","stop_desc",stop_lat,stop_lon
 200012338,"R. Evangelina De Assis, 104","Ref.: Av Dezenove De Janeiro/ R Jose De Assis",-23.557967,-46.522053
 200012340,"Av. Dezenove De Janeiro, 290","Ref.: R Pedro Voss/ R Monguba",-23.555076,-46.526409
 200012415,"Terminal Vila Carrão - Plataforma A","Term. Vila Carrão - Plataforma A Ref.: Plat. A",-23.558732,-46.522668
-200012416,"Terminal Vila Carrão - Plataforma B","Term. Vila Carrão - Plataforma B Ref.: Plat. B - Ponto 5",-23.558684,-46.522551
 200012417,"Terminal Vila Carrão - Plataforma B","Term. Vila Carrão - Plataforma B Ref.: Plat. B - Ponto 6",-23.558579,-46.522699
+200012418,"Terminal Vila Carrão - Plataforma B","Term. Vila Carrão - Plataforma B Ref.: Plat. B - Ponto 7",-23.558440,-46.522918
 200012419,"Terminal Vila Carrão - Plataforma B","Term. Vila Carrão - Plataforma B Ref.: Plat. B - Ponto 8",-23.558430,-46.522930
 200012420,"Terminal Vila Carrão - Plataforma C","Term. Vila Carrão - Plataforma C Ref.: Plat. C - Ponto 14",-23.558168,-46.523132
 200012421,"Terminal Vila Carrão - Plataforma B","Term. Vila Carrão - Plataforma B Ref.: Plat. B - Ponto 9",-23.558273,-46.523170
@@ -11165,7 +11166,6 @@ stop_id,"stop_name","stop_desc",stop_lat,stop_lon
 230009758,"Av. Lourenço Cabreira, 260","Ref.: R Jose Bonifacio Filho/ R Benedito Vieira Da Silva",-23.719174,-46.689789
 230009759,"Av. Lourenço Cabreira, 303","Ref.: R Jose Bonifacio Filho/ R Frutuoso Barbosa",-23.718931,-46.690038
 230009760,"Av. Matias Beck, 382","Ref.: R Paulo Bueno/ R Francisco Barreto",-23.712311,-46.689284
-230009761,"Av. Matias Beck, 305","Ref.: R Diogo Braga/ R Paulo Bueno",-23.711613,-46.688967
 230009762,"R. Armando Vieira, 148","Ref.: R Astolfo Vieira De Rezende/ R Durval De Morais",-23.705479,-46.685837
 230009763,"R. Durval Moraes, 151","Ref.: R Armando Vieira/ R Jose Ataliba Leonel",-23.705383,-46.685354
 230009764,"R. José Ataliba Leonel, 315","Ref.: R Astolfo Vieira De Rezende/ R Durval De Morais",-23.706623,-46.684827
@@ -12599,6 +12599,7 @@ stop_id,"stop_name","stop_desc",stop_lat,stop_lon
 310008347,"R. Luís Matheus, 520","Ref.: R Aguanil/ R Santa Tarcilia",-23.547098,-46.426487
 310008349,"R. Luís Matheus, 835","Ref.: R Frei Antonio Faggiano/ R General Moreira Couto",-23.550302,-46.425625
 310008350,"R. Luís Matheus, 1344","Ref.: R. Aquarela Do Brasil",-23.553816,-46.424322
+310008351,"R. Luís Matheus, 1505","Ref.: R Jardim Tamoio",-23.555438,-46.423470
 310008352,"R. Luís Matheus, 1502","Ref.: R Jardim Tamoio/ R Cunhanrequaro",-23.556377,-46.423135
 310008353,"R. Luís Matheus, 1710","Ref.: R Santana Do Rio Preto/ R Aldeia Maria",-23.558438,-46.421711
 310008354,"R. Luís Matheus, 1920","Ref.: R Santana Do Rio Preto/ R Aldeia Maria",-23.558983,-46.421361
@@ -14800,7 +14801,6 @@ stop_id,"stop_name","stop_desc",stop_lat,stop_lon
 450011771,"R. Sebastião Muniz De Sousa, 122","Ref.: R Fontes De Roma/ R Fausto De Gounod",-23.665777,-46.750425
 450011772,"R. Sebastião Muniz De Sousa, 235","Ref.: R Fontes De Roma/ R Fausto De Gounod",-23.665889,-46.750555
 450011773,"R. Sebastião Muniz De Sousa, 421","Ref.: R Fausto De Gounod/ Av Raquel Alves Moreira",-23.666491,-46.751597
-450011774,"R. Sebastião Muniz De Sousa, 676","R. Sebastião Muniz De Sousa, 676 Ref.: Av Raquel Alves Moreira/ R Fausto De Gounod",-23.667360,-46.752747
 450011775,"Av. Raquel Alves Moreira, 354","Ref.: R Sebastiao Muniz De Sousa/ Vel Quarenta E Dois",-23.667484,-46.752621
 450011777,"Av. Raquel Alves Moreira, 1099","Ref.: R Valdomiro Dos Santos Pereira/ R Expedito De Oliveira Santos",-23.666332,-46.753208
 450011778,"Pça. Manoel Maiotti","Pça. Manoel Maiotti Ref.: Pc Manoel Maiotti/ R Altino Alves De Abreu",-23.664846,-46.753142
@@ -21362,7 +21362,6 @@ stop_id,"stop_name","stop_desc",stop_lat,stop_lon
 910000809,"R. Sg. Miguel De Souza Filho, 23","Ref.: Av Bandeirantes Do Sul/ R Soldado Jose Vivanco Solano",-23.506449,-46.571650
 910000810,"Av. Tte. Amaro Felicíssimo Da Silveira, 1841","Ref.: Rod Presidente Dutra/ R Soldado Francisco Vitoriano",-23.509367,-46.571245
 910000811,"Av. Tte. Amaro Felicíssimo Da Silveira, 1792","Ref.: R Gentil Bispo/ R Soldado Aristides Gouveia",-23.509320,-46.570891
-910000812,"Av. Tte. Amaro Felicíssimo Da Silveira, 1399","Ref.: R Soldado Dionisio Chagas/ R Segundo Sargento Assad Feres",-23.512851,-46.571388
 910000813,"Al. 1º Sg. Basílio Nogueira Da Costa, 11","Ref.: Av Tenente Amaro Felicissimo Da Silveira/",-23.514216,-46.570850
 910000814,"Al. 1º Sg. Basílio Nogueira Da Costa, 242","Ref.: R Cabo Oscar Rossini/ R Soldado Americo Rodrigues",-23.515463,-46.569794
 910000815,"Pça. Novo Mundo, 87","Ref.: Al Segundo Sargento Ananias Holanda De Oliveira/ R Sargento Jose Pessoto Sobrinho",-23.517778,-46.568545
