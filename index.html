@@ -35,6 +35,35 @@
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
+  <!-- Abertura: ônibus visto de cima andando num trajeto (a animação fica no js/app.js) -->
+  <div id="intro" class="intro" aria-hidden="true">
+    <div class="intro__conteudo">
+      <svg class="intro__cena" viewBox="-150 -150 300 300" width="300" height="300">
+        <g id="introMundo" transform="translate(0 40) translate(0 -200)">
+          <g class="intro__ruas">
+            <path d="M-420 0 H420 M-420 -140 H420 M-420 150 H420 M-420 310 H420 M0 -420 V420 M-140 -420 V420 M280 -420 V420 M-90 433 L410 -433"/>
+            <path class="intro__viela" d="M-140 75 H0 M0 -70 H-140 M130 0 V150 M280 -70 H200 M0 230 H140"/>
+          </g>
+          <path id="introRastro" class="intro__rastro" d="M0 200 L0 40 Q0 0 40 0 L130 0 Q160 0 175 -26 L250 -156"/>
+          <path id="introRota" d="M0 200 L0 40 Q0 0 40 0 L130 0 Q160 0 175 -26 L250 -156" fill="none" stroke="none"/>
+        </g>
+        <g transform="translate(0 40) scale(1.3)">
+          <ellipse cx="1.5" cy="3" rx="13" ry="27" fill="#000" opacity=".16"/>
+          <rect x="-12.5" y="-19" width="3" height="4.5" rx="1" style="fill:var(--cor-marca)"/>
+          <rect x="9.5" y="-19" width="3" height="4.5" rx="1" style="fill:var(--cor-marca)"/>
+          <rect x="-10" y="-23" width="20" height="46" rx="5" style="fill:var(--cor-marca)"/>
+          <rect x="-8" y="-21" width="16" height="7" rx="2.5" fill="#E0E7FF"/>
+          <rect x="-7" y="-11" width="14" height="28" rx="2" fill="#000" opacity=".14"/>
+          <rect x="-4" y="-6" width="8" height="5" rx="1" fill="#fff" opacity=".4"/>
+          <rect x="-4" y="6" width="8" height="5" rx="1" fill="#fff" opacity=".4"/>
+          <circle cx="-6.5" cy="-22.5" r="1.6" fill="#FEF3C7"/><circle cx="6.5" cy="-22.5" r="1.6" fill="#FEF3C7"/>
+          <rect x="-8" y="21" width="4" height="1.6" rx=".8" fill="#F87171"/><rect x="4" y="21" width="4" height="1.6" rx=".8" fill="#F87171"/>
+        </g>
+      </svg>
+      <div class="intro__nome"><span class="brand__jota">Jota</span><span class="brand__bus">Bus</span></div>
+      <p class="intro__frase">Ônibus de São Paulo em tempo real</p>
+    </div>
+  </div>
   <header class="topbar">
     <a class="brand" href="./" aria-label="Início">
       <img class="brand__icone" src="icons/icon-192.png" alt="" width="40" height="40">
@@ -176,6 +205,26 @@
       <div class="cartao__botoes">
         <button id="avisoLocalAtivar" class="botao-principal" type="button">Ativar localização</button>
         <button id="avisoLocalPular" class="botao-secundario" type="button">Continuar sem</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Aviso de projeto de TCC: aparece depois da abertura, até marcar "Não exibir novamente" -->
+  <div id="avisoTcc" class="cartao-fundo" hidden>
+    <div class="cartao" role="dialog" aria-modal="true" aria-labelledby="avisoTccTitulo">
+      <svg class="ilustracao" viewBox="0 0 120 110" width="110" height="100" aria-hidden="true">
+        <circle cx="60" cy="58" r="48" style="fill:var(--cor-marca);opacity:.12"/>
+        <path d="M36 56 V74 Q60 90 84 74 V56 L60 66 Z" style="fill:var(--cor-marca);opacity:.7"/>
+        <path d="M60 28 L104 46 L60 64 L16 46 Z" style="fill:var(--cor-marca)"/>
+        <path d="M96 49 V72" stroke="#F59E0B" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="96" cy="75" r="4.5" fill="#F59E0B"/>
+      </svg>
+      <h2 id="avisoTccTitulo">Projeto de TCC</h2>
+      <p>O JotaBus é um protótipo desenvolvido para o Trabalho de Conclusão de Curso de Ciência da Computação da FAM.</p>
+      <p class="cartao__dica">Desenvolvido por João Pedro Brito Almeida da Silva. Os dados dos ônibus vêm da SPTrans (Olho Vivo) e podem ter atrasos.</p>
+      <label class="cartao__marcar"><input id="avisoTccOcultar" type="checkbox"> Não exibir novamente</label>
+      <div class="cartao__botoes">
+        <button id="avisoTccOk" class="botao-principal" type="button">OK</button>
       </div>
     </div>
   </div>

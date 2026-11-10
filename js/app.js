@@ -14,6 +14,99 @@
 
   // O nome no topo fica no index.html ("Jota" e "Bus" em cores diferentes)
 
+  /* ---------- Abertura animada (toda vez que o app abre) ---------- */
+  // Um ônibus visto de cima anda por um trajeto: a "câmera" fica presa nele e o mapa
+  // gira nas curvas. Dura uns 2 s e um toque pula. Depois vem o aviso do TCC e só
+  // então o pedido de localização, para nada aparecer um em cima do outro.
+  var introAtiva = true;
+  var filaPosIntro = [];
+  function depoisDaIntro(fn) { if (introAtiva) filaPosIntro.push(fn); else fn(); }
+  function liberarPosIntro() {
+    introAtiva = false;
+    filaPosIntro.splice(0).forEach(function (fn) { fn(); });
+  }
+
+  function mostrarAvisoTcc() {
+    var cartao = document.getElementById("avisoTcc");
+    var oculto = false;
+    try { oculto = localStorage.getItem("busjp-intro-oculta") === "1"; } catch (e) {}
+    var semNet = !document.getElementById("semInternet").hidden;
+    if (!cartao || oculto || semNet) { liberarPosIntro(); return; }
+    var ok = document.getElementById("avisoTccOk");
+    cartao.hidden = false;
+    ok.focus();
+    ok.addEventListener("click", function () {
+      try {
+        if (document.getElementById("avisoTccOcultar").checked) localStorage.setItem("busjp-intro-oculta", "1");
+      } catch (e) {}
+      cartao.hidden = true;
+      liberarPosIntro();
+    }, { once: true });
+  }
+
+  (function abertura() {
+    var tela = document.getElementById("intro");
+    var mundo = document.getElementById("introMundo");
+    var rota = document.getElementById("introRota");
+    var rastro = document.getElementById("introRastro");
+    if (!tela || !mundo || !rota || !rota.getTotalLength) { if (tela) tela.hidden = true; mostrarAvisoTcc(); return; }
+
+    var DURACAO = 1500, NOME_EM = 650, SEGURA = 300;
+    var total = rota.getTotalLength();
+    var semMovimento = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var inicio = null, giroAnterior = 0, acabou = false;
+    rastro.style.strokeDasharray = total;
+    rastro.style.strokeDashoffset = total;
+
+    // Começa devagar, acelera e freia no fim, como um ônibus
+    function suave(t) { return 0.5 - Math.cos(Math.PI * t) / 2; }
+
+    // Põe o ponto "s" do trajeto embaixo do ônibus e gira o mapa para ele apontar para cima
+    function posicionar(s) {
+      var p = rota.getPointAtLength(s);
+      var a = rota.getPointAtLength(Math.max(0, s - 7));
+      var b = rota.getPointAtLength(Math.min(total, s + 7));
+      var giro = -90 - Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+      while (giro - giroAnterior > 180) giro -= 360;
+      while (giro - giroAnterior < -180) giro += 360;
+      giroAnterior = giro;
+      mundo.setAttribute("transform", "translate(0 40) rotate(" + giro.toFixed(2) + ") translate(" + (-p.x).toFixed(2) + " " + (-p.y).toFixed(2) + ")");
+      rastro.style.strokeDashoffset = total - s;
+    }
+
+    function fechar(rapido) {
+      if (acabou) return;
+      acabou = true;
+      tela.classList.add("intro--nome");
+      if (rapido) tela.classList.add("intro--rapida");
+      tela.classList.add("intro--saindo");
+      setTimeout(function () { tela.hidden = true; mostrarAvisoTcc(); }, rapido ? 180 : 350);
+    }
+
+    function quadro(agora) {
+      if (acabou) return;
+      if (inicio === null) inicio = agora;
+      var t = Math.min(1, (agora - inicio) / DURACAO);
+      posicionar(total * suave(t));
+      if (agora - inicio >= NOME_EM) tela.classList.add("intro--nome");
+      if (t < 1) requestAnimationFrame(quadro);
+      else setTimeout(function () { fechar(false); }, SEGURA);
+    }
+
+    tela.addEventListener("click", function () { fechar(true); });
+    document.addEventListener("keydown", function (e) { if (!acabou && (e.key === "Escape" || e.key === "Enter" || e.key === " ")) fechar(true); });
+
+    if (semMovimento) {
+      // Sem movimento: mostra a cena parada já no fim e o nome, e sai
+      posicionar(total);
+      tela.classList.add("intro--nome");
+      setTimeout(function () { fechar(false); }, 900);
+    } else {
+      posicionar(0);
+      requestAnimationFrame(quadro);
+    }
+  })();
+
   /* ---------- Sem internet ---------- */
   // Sem conexão, a biblioteca do mapa (Leaflet, que vem da internet) não carrega e o app
   // não tem como funcionar. Em vez de quebrar, mostra a tela "sem internet" e recarrega
@@ -144,9 +237,9 @@
       (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);   // iPad novo
   }
 
-  // Pede a localização logo no início, antes das outras etapas: assim, mesmo que
-  // algo adiante falhe, o aparelho já recebeu o pedido de permissão.
-  irParaMim(false);
+  // Pede a localização logo que a abertura e o aviso do TCC saem da tela (o pedido fica
+  // registrado aqui, antes das outras etapas: mesmo que algo adiante falhe, ele acontece).
+  depoisDaIntro(function () { irParaMim(false); });
 
   /* ---------- Paradas de ônibus ---------- */
   var indiceParadas = null;
