@@ -1,7 +1,7 @@
 // Service worker mínimo: guarda a "casca" do app para abrir mais rápido.
 // Nunca guarda chamadas à API (/api) nem os blocos do mapa.
 // v2: guarda todos os scripts do app, para a tela "sem internet" aparecer mesmo offline.
-const CACHE = "jotabus-casca-v4";   // trocar a versão força o celular a baixar a casca nova
+const CACHE = "jotabus-casca-v5";   // trocar a versão força o celular a baixar a casca nova
 const CASCA = [
   "./", "index.html", "css/styles.css", "js/config.js", "js/app.js",
   "js/paradas.js", "js/painel.js", "js/busca.js",
