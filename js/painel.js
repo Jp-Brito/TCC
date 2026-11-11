@@ -49,7 +49,8 @@
     dataServidor: NaN,     // hora do servidor (cabeçalho Date da resposta)
     recebidoEm: 0,
     proximaEm: 0,          // quando será a próxima tentativa (Date.now)
-    ultimoSucesso: 0       // quando a última atualização deu certo (Date.now), para o aviso de dado velho
+    ultimoSucesso: 0,      // quando a última atualização deu certo (Date.now), para o aviso de dado velho
+    programacao: null      // { parada, em, linhas } tabela da SPTrans (api/programacao), plano B sem GPS
   };
 
   // Simulação de falhas para os testes do TCC. Só liga com ?simular=falha ou ?simular=lento
@@ -404,17 +405,27 @@
       (estado.parada.referencia ? " · " + estado.parada.referencia : "");
 
     els.corpo.textContent = "";
+    var tabela = linhasDaTabela(estado.programacao && estado.programacao.parada === estado.parada.id
+      ? estado.programacao.linhas : [], estado.linhas);
 
     if (estado.carregando && estado.linhas.length === 0) {
       els.corpo.appendChild(el("p", "painel__aviso", "Buscando previsões..."));
     } else if (estado.erro && estado.linhas.length === 0) {
       // a faixa amarela (atualizarAlerta) explica a falha
     } else if (estado.linhas.length === 0) {
-      els.corpo.appendChild(el("p", "painel__aviso", "Nenhum ônibus previsto para este ponto agora."));
+      els.corpo.appendChild(el("p", "painel__aviso", tabela.length
+        ? "Nenhum ônibus ao vivo neste ponto agora."
+        : "Nenhum ônibus previsto para este ponto agora."));
     } else {
       estado.linhas.forEach(function (linha) {
         els.corpo.appendChild(criarLinha(linha));
       });
+    }
+
+    // Plano B: linhas sem ônibus ao vivo agora, pela tabela da SPTrans (estimativa, sem GPS)
+    if (tabela.length && !(estado.carregando && estado.linhas.length === 0)) {
+      els.corpo.appendChild(el("p", "painel__secao", "🕒 Pela tabela da SPTrans · sem GPS"));
+      tabela.forEach(function (item) { els.corpo.appendChild(criarLinhaTabela(item)); });
     }
 
     var rodape = estado.horaReferencia ? "Atualizado às " + estado.horaReferencia : "";
@@ -423,12 +434,81 @@
 
     // Resumo mostrado quando o painel está minimizado: linha selecionada e a próxima chegada
     var selecionada = estado.linhas.filter(function (l) { return l.codigo === estado.codigoSelecionado; })[0];
+    var primeiraTabela = tabela.filter(function (t) { return t.proximos.length; })[0];
     els.resumo.textContent = selecionada
       ? selecionada.letreiro + " · " + textoTempo(selecionada.veiculos[0].minutos) + (selecionada.destino ? " · " + selecionada.destino : "")
-      : (estado.carregando ? "Buscando previsões..." : "Nenhum ônibus previsto agora");
+      : (estado.carregando ? "Buscando previsões..."
+        : primeiraTabela ? "🕒 " + primeiraTabela.letreiro + " · ~" + primeiraTabela.proximos[0].hora + " pela tabela"
+        : "Nenhum ônibus previsto agora");
     if (atualizarAlerta()) els.resumo.textContent = "⚠ " + els.resumo.textContent;
 
     medirAltura();
+  }
+
+  /* ---------- Tabela da SPTrans (api/programacao): plano B quando não há ônibus ao vivo ---------- */
+
+  // Tira da tabela as linhas (no mesmo sentido) que já aparecem com ônibus ao vivo
+  function linhasDaTabela(tabela, aoVivo) {
+    var vivos = {};
+    (aoVivo || []).forEach(function (l) { vivos[l.letreiro + "|" + l.sentido] = true; });
+    return (tabela || []).filter(function (t) { return !vivos[t.letreiro + "|" + t.sentido]; });
+  }
+
+  function textoTabela(minutos) {
+    return minutos <= 0 ? "~agora" : "~" + minutos + " min";
+  }
+
+  // Busca a tabela da parada aberta; repete no máximo a cada 1 min (os horários são fixos)
+  function buscarProgramacao() {
+    var parada = estado.parada;
+    if (!parada) return;
+    var atual = estado.programacao;
+    if (atual && atual.parada === parada.id && (atual.carregando || Date.now() - atual.em < 60000)) return;
+    estado.programacao = { parada: parada.id, em: Date.now(), linhas: atual && atual.parada === parada.id ? atual.linhas : [], carregando: true };
+    fetch("api/programacao?parada=" + encodeURIComponent(parada.id))
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (dados) {
+        if (!estado.parada || estado.parada.id !== parada.id) return;
+        estado.programacao = { parada: parada.id, em: Date.now(), linhas: dados.linhas || [], carregando: false };
+        renderizar();
+      })
+      .catch(function () {
+        // sem tabela: o painel continua só com o tempo real; tenta de novo no próximo minuto
+        if (estado.programacao && estado.programacao.parada === parada.id) estado.programacao.carregando = false;
+      });
+  }
+
+  function criarLinhaTabela(item) {
+    var caixa = el("div", "linha linha--tabela" + (item.proximos.length ? "" : " linha--fora"));
+    var corLinha = corDaLinha(item.cor);
+    var etiqueta = el("span", "linha__letreiro", item.letreiro);
+    etiqueta.style.background = "#" + corLinha.fundo;
+    etiqueta.style.color = "#" + corLinha.texto;
+    caixa.appendChild(etiqueta);
+
+    var meio = el("span", "linha__meio");
+    meio.appendChild(el("span", "linha__destino", item.destino || ""));
+    var detalhe;
+    if (!item.proximos.length) detalhe = "Fora do horário agora";
+    else if (item.ultimo) detalhe = "Último do dia pela tabela";
+    else {
+      detalhe = item.intervaloMin ? "a cada " + item.intervaloMin + " min" : "";
+      var depois = item.proximos.slice(1).map(function (p) { return p.hora; });
+      if (depois.length) detalhe += (detalhe ? " · " : "") + "depois " + depois.join(", ");
+    }
+    meio.appendChild(el("span", "linha__depois", detalhe));
+    caixa.appendChild(meio);
+
+    var tempo = el("span", "linha__tempo");
+    if (item.proximos.length) {
+      tempo.appendChild(el("strong", "", textoTabela(item.proximos[0].minutos)));
+      tempo.appendChild(el("small", "", item.proximos[0].hora));
+    } else if (item.volta) {
+      tempo.appendChild(el("strong", "", item.volta.hora));
+      tempo.appendChild(el("small", "", item.volta.amanha ? "amanhã" : "volta hoje"));
+    }
+    caixa.appendChild(tempo);
+    return caixa;
   }
 
   function criarLinha(linha) {
@@ -1175,6 +1255,7 @@
     if (!estado.parada) return;
     if (document.hidden) { estado.timer = null; return; }   // pausa com a aba em segundo plano
 
+    buscarProgramacao();   // a tabela vem à parte e não depende da SPTrans responder
     if (estado.controlador) estado.controlador.abort();
     var controlador = new AbortController();
     estado.controlador = controlador;
@@ -1347,6 +1428,7 @@
     estado.carregando = true;
     estado.ajustarMapa = false;
     estado.atrasoMs = cfg.painel.atualizacaoMs;
+    estado.programacao = null;
 
     limparOnibus();
     historico = {};
@@ -1496,7 +1578,8 @@
       paraMinutos: paraMinutos, minutosAte: minutosAte, textoTempo: textoTempo,
       processar: processar, decodificarPolilinha: decodificarPolilinha, rumoNoTracado: rumoNoTracado, distanciaM: distanciaM, rumoEntre: rumoEntre, textoIdade: textoIdade,
       diferencaAngular: diferencaAngular, manterAusentes: manterAusentes, raioParadaLinha: raioParadaLinha, textoCaminho: textoCaminho,
-      trechoNoTracado: trechoNoTracado, situacaoSentido: situacaoSentido, textoHora: textoHora
+      trechoNoTracado: trechoNoTracado, situacaoSentido: situacaoSentido, textoHora: textoHora,
+      linhasDaTabela: linhasDaTabela, textoTabela: textoTabela
     }
   };
 })();

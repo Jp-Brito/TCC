@@ -33,6 +33,9 @@
     "api/paradas-linha.js": {
       "includeFiles": "data/{gtfs/trips.txt,gtfs/stop_times.txt,tracados.json,stops.json}"
     },
+    "api/programacao.js": {
+      "includeFiles": "data/{gtfs/routes.txt,gtfs/trips.txt,gtfs/stop_times.txt,gtfs/frequencies.txt,gtfs/calendar.txt}"
+    },
     "api/trilhos.js": {
       "includeFiles": "data/{tracados.json,stops.json,gtfs/routes.txt,gtfs/trips.txt,gtfs/stop_times.txt,gtfs/frequencies.txt,gtfs/calendar.txt}"
     }

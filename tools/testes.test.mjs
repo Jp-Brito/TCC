@@ -13,6 +13,7 @@ import previsao from "../api/previsao.js";
 import rotaAPe from "../api/rota-a-pe.js";
 import trilhos from "../api/trilhos.js";
 import { lerSituacao } from "../api/situacao-trilhos.js";
+import programacao, { montarIndice, programacaoDaParada } from "../api/programacao.js";
 
 process.env.OLHOVIVO_TOKEN = "token-de-teste";   // só para os testes; a Olho Vivo é simulada
 
@@ -220,4 +221,64 @@ caso("situação das linhas: lê a resposta da fonte (todas as operadoras)", () 
   assert.equal(d.linhas[3].motivo, null);                                        // detalhe igual ao status: não repete
   assert.equal(d.atualizadoEm, "2026-11-09T17:16:15-03:00");
   assert.equal(lerSituacao({ status: false }).linhas.length, 0);                 // formato diferente: nada (o app esconde)
+});
+
+/* ---------- Programação pela tabela (api/programacao), com um GTFS pequeno feito à mão ---------- */
+// L1-10: só dias úteis, sai do terminal (parada 1) e leva 10 min até a parada 2.
+// N1-11: noturna, todo dia, sai 23:00 e a última 01:30 (25:30 no GTFS); leva 30 min até a parada 2.
+const gtfsTeste = montarIndice({
+  trips: '"route_id","service_id","trip_id","trip_headsign","direction_id","shape_id"\n' +
+    '"L1-10","U__","L1-10-0","Centro","0","1"\n"N1-11","USD","N1-11-1","Jd. Noite","1","2"\n',
+  stop_times: '"trip_id","arrival_time","departure_time","stop_id","stop_sequence"\n' +
+    '"L1-10-0","05:00:00","05:00:00","1","1"\n"L1-10-0","05:10:00","05:10:00","2","2"\n' +
+    '"N1-11-1","23:00:00","23:00:00","9","1"\n"N1-11-1","23:30:00","23:30:00","2","2"\n',
+  frequencies: '"trip_id","start_time","end_time","headway_secs"\n' +
+    '"L1-10-0","05:00:00","21:59:00","600"\n"L1-10-0","22:00:00","22:59:00","1200"\n"N1-11-1","23:00:00","25:59:00","1800"\n',
+  calendar: '"service_id","monday","tuesday","wednesday","thursday","friday","saturday","sunday","start_date","end_date"\n' +
+    '"U__","1","1","1","1","1","0","0","20231001","20270601"\n"USD","1","1","1","1","1","1","1","20231001","20270601"\n'
+});
+const hms = (h, m) => h * 3600 + m * 60;
+
+caso("tabela: próximas passagens e virada da meia-noite (terça 22:21)", () => {
+  const linhas = programacaoDaParada(gtfsTeste, "2", "2026-11-10", hms(22, 21));
+  const l1 = linhas.find((l) => l.letreiro === "L1-10");
+  assert.deepEqual(l1.proximos.map((p) => p.hora), ["22:30", "22:50"]);
+  assert.equal(l1.proximos[0].minutos, 9);
+  assert.equal(l1.intervaloMin, 20);
+  assert.equal(l1.ultimo, true);              // depois das 22:50 só amanhã cedo
+  const n1 = linhas.find((l) => l.letreiro === "N1-11");
+  assert.equal(n1.sentido, 2);                // direction_id 1 = sentido 2 da Olho Vivo
+  assert.deepEqual(n1.proximos.map((p) => p.hora), ["23:30", "00:00"]);
+});
+
+caso("tabela: de madrugada usa as viagens da noite anterior e mostra quando a linha volta", () => {
+  const linhas = programacaoDaParada(gtfsTeste, "2", "2026-11-11", hms(0, 40));
+  assert.deepEqual(linhas.find((l) => l.letreiro === "N1-11").proximos.map((p) => p.hora), ["01:00", "01:30", "02:00"]);
+  const l1 = linhas.find((l) => l.letreiro === "L1-10");
+  assert.deepEqual(simples(l1.proximos), []);
+  assert.deepEqual(l1.volta, { hora: "05:10", amanha: false });
+});
+
+caso("tabela: linha só de dias úteis não aparece no sábado", () => {
+  const linhas = programacaoDaParada(gtfsTeste, "2", "2026-11-14", hms(10, 0));
+  assert.equal(linhas.some((l) => l.letreiro === "L1-10"), false);
+  assert.deepEqual(linhas.find((l) => l.letreiro === "N1-11").volta, { hora: "23:30", amanha: false });
+});
+
+caso("tabela: some do painel a linha que já tem ônibus ao vivo no mesmo sentido", () => {
+  const tabela = [{ letreiro: "647A-10", sentido: 2 }, { letreiro: "647A-10", sentido: 1 }, { letreiro: "809J-10", sentido: 1 }];
+  const aoVivo = [{ letreiro: "647A-10", sentido: 2 }];
+  assert.deepEqual(simples(P.linhasDaTabela(tabela, aoVivo)), [{ letreiro: "647A-10", sentido: 1 }, { letreiro: "809J-10", sentido: 1 }]);
+  assert.equal(P.textoTabela(0), "~agora");
+  assert.equal(P.textoTabela(12), "~12 min");
+});
+
+caso("tabela: a função recusa parada inválida e responde com o GTFS real", () => {
+  const erro = respostaFalsa();
+  programacao({ method: "GET", query: { parada: "abc" } }, erro);
+  assert.equal(erro.codigo, 400);
+  const res = respostaFalsa();
+  programacao({ method: "GET", query: { parada: "5507020" } }, res);
+  assert.equal(res.codigo, 200);
+  assert.ok(res.corpo.linhas.length > 5 && res.corpo.validoAte);
 });

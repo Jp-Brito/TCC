@@ -343,6 +343,13 @@ body.painel-aberto .leaflet-bottom { bottom: var(--altura-painel); }
 .linha__tempo strong { font-size: 1.05rem; color: var(--cor-marca); }
 .linha__tempo small { font-size: 0.72rem; color: var(--texto-suave); }
 
+/* Linhas pela tabela da SPTrans (sem GPS): borda tracejada e tempo em cinza, para não
+   confundir com o tempo real */
+.painel__secao { margin: 14px 4px 4px; font-size: 0.78rem; font-weight: 700; color: var(--texto-suave); }
+.linha--tabela { border-style: dashed; cursor: default; }
+.linha--tabela .linha__tempo strong { color: var(--texto-suave); }
+.linha--fora { opacity: 0.65; }
+
 /* Ônibus no mapa: visto de cima, na cor da linha */
 .onibus-icone { background: transparent; border: 0; filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.65)); }
 .onibus3d {
