@@ -345,7 +345,16 @@ body.painel-aberto .leaflet-bottom { bottom: var(--altura-painel); }
 
 /* Linhas pela tabela da SPTrans (sem GPS): borda tracejada e tempo em cinza, para não
    confundir com o tempo real */
-.painel__secao { margin: 14px 4px 4px; font-size: 0.78rem; font-weight: 700; color: var(--texto-suave); }
+.painel__programados {
+  display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;
+  margin: 10px 0 4px; padding: 9px 12px; font: inherit; font-size: 0.85rem; font-weight: 600;
+  color: var(--texto-suave); background: transparent; border: 1px dashed var(--borda-caixa);
+  border-radius: 999px; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.painel__programados:hover, .painel__programados:focus-visible { color: var(--texto-icone); border-color: var(--cor-marca); outline: 0; }
+.painel__programados svg { transition: transform 0.2s ease; }
+.painel__programados[aria-expanded="true"] svg { transform: rotate(180deg); }
+.painel__nota-tabela { margin: 6px 4px 2px; text-align: center; font-size: 0.75rem; color: var(--texto-suave); }
 .linha--tabela { border-style: dashed; cursor: default; }
 .linha--tabela .linha__tempo strong { color: var(--texto-suave); }
 .linha--fora { opacity: 0.65; }

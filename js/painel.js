@@ -50,7 +50,8 @@
     recebidoEm: 0,
     proximaEm: 0,          // quando será a próxima tentativa (Date.now)
     ultimoSucesso: 0,      // quando a última atualização deu certo (Date.now), para o aviso de dado velho
-    programacao: null      // { parada, em, linhas } tabela da SPTrans (api/programacao), plano B sem GPS
+    programacao: null,     // { parada, em, linhas } tabela da SPTrans (api/programacao), plano B sem GPS
+    verProgramados: null   // lista da tabela aberta? null = automático (abre só sem ônibus ao vivo)
   };
 
   // Simulação de falhas para os testes do TCC. Só liga com ?simular=falha ou ?simular=lento
@@ -422,10 +423,32 @@
       });
     }
 
-    // Plano B: linhas sem ônibus ao vivo agora, pela tabela da SPTrans (estimativa, sem GPS)
+    // Plano B: linhas sem ônibus ao vivo agora, pela tabela da SPTrans (estimativa, sem GPS).
+    // Fica atrás de um botão discreto, para não se confundir com o tempo real; abre sozinha
+    // só quando não há nenhum ônibus ao vivo (senão o painel ficaria vazio).
     if (tabela.length && !(estado.carregando && estado.linhas.length === 0)) {
-      els.corpo.appendChild(el("p", "painel__secao", "🕒 Pela tabela da SPTrans · sem GPS"));
-      tabela.forEach(function (item) { els.corpo.appendChild(criarLinhaTabela(item)); });
+      var abertos = estado.verProgramados !== null ? estado.verProgramados : estado.linhas.length === 0;
+      var botaoTabela = el("button", "painel__programados");
+      botaoTabela.type = "button";
+      botaoTabela.setAttribute("aria-expanded", abertos ? "true" : "false");
+      botaoTabela.appendChild(el("span", "", "🕒 Programados pela tabela (" + tabela.length + ")"));
+      var seta = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      seta.setAttribute("viewBox", "0 0 24 24"); seta.setAttribute("width", "16"); seta.setAttribute("height", "16");
+      seta.setAttribute("aria-hidden", "true");
+      seta.innerHTML = '<polyline points="6 9 12 15 18 9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>';
+      botaoTabela.appendChild(seta);
+      botaoTabela.addEventListener("click", function () {
+        estado.verProgramados = !abertos;
+        estado.focarProgramados = true;
+        renderizar();
+      });
+      els.corpo.appendChild(botaoTabela);
+      if (abertos) {
+        els.corpo.appendChild(el("p", "painel__nota-tabela", "Horários estimados pela tabela da SPTrans, sem GPS."));
+        tabela.forEach(function (item) { els.corpo.appendChild(criarLinhaTabela(item)); });
+      }
+      // depois de tocar, o foco continua no botão (a lista é redesenhada)
+      if (estado.focarProgramados) { estado.focarProgramados = false; botaoTabela.focus(); }
     }
 
     var rodape = estado.horaReferencia ? "Atualizado às " + estado.horaReferencia : "";
@@ -1429,6 +1452,7 @@
     estado.ajustarMapa = false;
     estado.atrasoMs = cfg.painel.atualizacaoMs;
     estado.programacao = null;
+    estado.verProgramados = null;
 
     limparOnibus();
     historico = {};
