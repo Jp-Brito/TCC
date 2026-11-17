@@ -1,11 +1,11 @@
 {
   "fonte": "Mobility Database (mdb-8)",
-  "baixadoEm": "2026-11-10T14:12:39.058Z",
-  "hash": "4c34deb6e8df4d76b36d11e20acfe3d02139d212b82dd1300d36624cec54aec2",
+  "baixadoEm": "2026-11-17T15:25:45.952Z",
+  "hash": "fd069be145d3cd07e31c3efe5f2136ca7d3fa13a9bd8fe1e0214f2eeab61f88a",
   "validoAte": "2027-06-01",
   "totais": {
-    "linhas": 1365,
-    "paradas": 22273,
+    "linhas": 1366,
+    "paradas": 22261,
     "viagens": 2268
   }
 }

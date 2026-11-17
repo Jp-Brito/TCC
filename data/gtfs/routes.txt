@@ -779,6 +779,7 @@
 "627J-10","1","627J-10","Jd. Miriam - Metrô São Judas","3","0082BA","FFFFFF"
 "627M-10","1","627M-10","Mar Paulista - Term. Sto. Amaro","3","0082BA","FFFFFF"
 "6291-10","1","6291-10","Inocoop Campo Limpo - Term. Bandeira","3","782F40","FFFFFF"
+"6291-31","1","6291-31","Inocoop Campo Limpo - Term. Bandeira","3","782F40","FFFFFF"
 "6338-10","1","6338-10","Jd. Miriam - Pq. Ibirapuera","3","0082BA","FFFFFF"
 "6358-10","1","6358-10","Jd. Luso - Term. Bandeira","3","0082BA","FFFFFF"
 "637A-10","1","637A-10","Term. Jd. âNgela - Term. Pinheiros","3","782F40","FFFFFF"
